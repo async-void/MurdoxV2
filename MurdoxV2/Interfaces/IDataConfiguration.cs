@@ -10,6 +10,6 @@ namespace MurdoxV2.Interfaces
 {
     public interface IDataConfiguration
     {
-        Task<Result<ConfigJson, ConfigurationDataServiceProvider>> GetDiscordTokenAsync();
+        Task<Result<string, SystemError<ConfigurationDataServiceProvider>>> GetDiscordTokenAsync();
     }
 }

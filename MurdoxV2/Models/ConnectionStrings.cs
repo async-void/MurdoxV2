@@ -13,7 +13,7 @@ namespace MurdoxV2.Models
         public string? Default { get; set; }
         [JsonPropertyName("cloud")]
         public string? Cloud { get; set; }
-        [JsonPropertyName("gameday")] 
-        public string? Gameday { get; set; }
+        [JsonPropertyName("murdox")] 
+        public string? Murdox { get; set; }
     }
 }
