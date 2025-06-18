@@ -1,10 +1,14 @@
 ﻿using DSharpPlus;
+using DSharpPlus.Commands.Processors.SlashCommands;
+using DSharpPlus.Commands.Processors.TextCommands;
 using DSharpPlus.Extensions;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using MurdoxV2.Data.DbContext;
+using MurdoxV2.Factories;
 using MurdoxV2.Services;
-using Newtonsoft.Json.Linq;
 using Serilog;
 using Serilog.Sinks.SystemConsole.Themes;
 
@@ -12,18 +16,19 @@ namespace MurdoxV2
 {
     internal class Program
     {
-        
         static async Task Main(string[] args)
         {
             var configService = new ConfigurationDataServiceProvider();
             var token = await configService.GetDiscordTokenAsync();
+            var conStr = await configService.GetConnectionStringsAsync();
+
             if (!token.IsOk)
             {
-                Console.WriteLine($"Error retrieving token: {token.Error.ErrorMessage}");
+                Log.Information($"Error retrieving token: {token.Error.ErrorMessage}");
                 return;
             }
 
-            var intents = DiscordIntents.All;
+            var intents = TextCommandProcessor.RequiredIntents | SlashCommandProcessor.RequiredIntents | DiscordIntents.All;
 
             Log.Logger = new LoggerConfiguration()
                 .MinimumLevel.Verbose()
@@ -41,7 +46,9 @@ namespace MurdoxV2
                     services.AddLogging(logging => logging.ClearProviders().AddSerilog());
                     services.AddHostedService<BotService>()
                         .AddDiscordClient(token.Value, intents);
+                    services.AddSingleton<IDbContextFactory<AppDbContext>>(new AppDbContextFactory(conStr.Value.ConnectionStrings!.Murdox!));
                 })
+                
                 .RunConsoleAsync();
 
             await Log.CloseAndFlushAsync();

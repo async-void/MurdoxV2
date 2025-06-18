@@ -1,6 +1,7 @@
 ﻿using DSharpPlus;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using Serilog;
 
 namespace MurdoxV2.Services
 {
@@ -19,6 +20,7 @@ namespace MurdoxV2.Services
 
         public async Task StartAsync(CancellationToken cancellationToken)
         {
+            Log.Information("Connecting to Discord...");
             await dClient.ConnectAsync();
         }
 
