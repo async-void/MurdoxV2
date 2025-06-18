@@ -12,7 +12,6 @@ namespace MurdoxV2.Factories
     public class AppDbContextFactory : IDbContextFactory<AppDbContext>
     {
         private readonly string _conStr;
-
         public AppDbContextFactory(string conStr)
         {
             _conStr = conStr;

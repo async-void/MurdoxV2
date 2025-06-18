@@ -17,6 +17,7 @@ namespace MurdoxV2.Models
         public required string Nickname { get; set; }
         public required string AvatarUrl { get; set; }
         public string? UserStatus { get; set; }
+        public int XP { get; set; }
         public DateTimeOffset? JoinedAt { get; set; }
         public DateTimeOffset? CreatedAt { get; set; }
         public DateTimeOffset? LastActiveAt { get; set; }
