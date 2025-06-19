@@ -43,7 +43,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Folder Include="SlashCommands\Moderation\" />
     <Folder Include="SlashCommands\Member\" />
     <Folder Include="SlashCommands\Economy\" />
   </ItemGroup>

@@ -1,4 +1,5 @@
 ﻿using DSharpPlus;
+using DSharpPlus.Commands;
 using DSharpPlus.Commands.Processors.SlashCommands;
 using DSharpPlus.Commands.Processors.TextCommands;
 using DSharpPlus.Extensions;
@@ -9,6 +10,7 @@ using Microsoft.Extensions.Logging;
 using MurdoxV2.Data.DbContext;
 using MurdoxV2.Factories;
 using MurdoxV2.Services;
+using MurdoxV2.SlashCommands.Moderation;
 using Serilog;
 using Serilog.Sinks.SystemConsole.Themes;
 
@@ -38,14 +40,20 @@ namespace MurdoxV2
                  outputTemplate: "[{Timestamp:yyyy-MM-dd HH:mm:ss.fff zzz} {SourceContext} {Level:u3}] {Message:lj}{NewLine}")
                 .CreateLogger();
 
-            await Host.CreateDefaultBuilder(args)
+            await Host.CreateDefaultBuilder()
                 .UseSerilog()
                 .UseConsoleLifetime()
+                
                 .ConfigureServices((context, services) =>
                 {
                     services.AddLogging(logging => logging.ClearProviders().AddSerilog());
                     services.AddHostedService<BotService>()
-                        .AddDiscordClient(token.Value, intents);
+                        .AddDiscordClient(token.Value, intents)
+                        .AddCommandsExtension((options, config) =>
+                        {
+                           config.AddCommands<ModerationCommands>();
+                        });
+
                     services.AddSingleton<IDbContextFactory<AppDbContext>>(new AppDbContextFactory(conStr.Value.ConnectionStrings!.Murdox!));
                 })
                 
