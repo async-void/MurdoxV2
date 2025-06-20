@@ -1,4 +1,6 @@
 ﻿using DSharpPlus.Commands;
+using DSharpPlus.Commands.ContextChecks;
+using DSharpPlus.Entities;
 using Microsoft.EntityFrameworkCore;
 using MurdoxV2.Data.DbContext;
 using System;
@@ -10,14 +12,42 @@ using System.Threading.Tasks;
 
 namespace MurdoxV2.SlashCommands.Moderation
 {
-    public class ModerationCommands(IDbContextFactory<AppDbContext> dbFactory)
+    public class ModerationCommands()
     {
-        [Command("add_member")]
-        [Description("Adds a member to the Server.")]
-        public async Task AddMember(CommandContext ctx, [Parameter("username")] string username)
+        [Command("mod")]
+        [Description("handle moderation commands")]
+        [RequirePermissions(DiscordPermission.ManageGuild)]
+        public async Task ModCommand(CommandContext ctx)
         {
-            var db = dbFactory.CreateDbContext();
-            var member = db.Members.FirstOrDefault(m => m.GlobalUsername == username && m.ServerId == ctx.Guild.Id.ToString());
+            await ctx.DeferResponseAsync();
+            
+            var btns = new DiscordComponent[]
+            {
+                new DiscordButtonComponent(DiscordButtonStyle.Primary, "purgeBtn", "Purge"),
+                new DiscordButtonComponent(DiscordButtonStyle.Danger, "banBtn", "Ban Member"),
+                new DiscordButtonComponent(DiscordButtonStyle.Secondary, "warnBtn", "Warn Member"),
+            };
+
+            var components = new DiscordComponent[]
+            {
+                new DiscordTextDisplayComponent("**Moderation Commands**"),
+                new DiscordSeparatorComponent(true, DiscordSeparatorSpacing.Large),
+                new DiscordTextDisplayComponent("Choose a mod command below"),
+                new DiscordSeparatorComponent(true, DiscordSeparatorSpacing.Small),
+                new DiscordSectionComponent("Purge Messages", new DiscordButtonComponent(DiscordButtonStyle.Primary, "purgeBtn", "Purge")),
+                new DiscordSeparatorComponent(true, DiscordSeparatorSpacing.Small),
+                new DiscordSectionComponent("Warn Member", new DiscordButtonComponent(DiscordButtonStyle.Primary, "warnBtn", "Warn")),
+                new DiscordSeparatorComponent(true, DiscordSeparatorSpacing.Small),
+                new DiscordSectionComponent("Ban Member", new DiscordButtonComponent(DiscordButtonStyle.Danger, "banBtn", "Ban")),
+            };
+
+            var container = new DiscordContainerComponent(components, false, DiscordColor.Gray);
+
+            var msg = new DiscordMessageBuilder()
+                .EnableV2Components()
+                .AddContainerComponent(container);
+            await ctx.EditResponseAsync(msg);
+
         }
     }
 }

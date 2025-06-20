@@ -8,10 +8,10 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="DSharpPlus" Version="5.0.0-nightly-02522" />
-    <PackageReference Include="DSharpPlus.Commands" Version="5.0.0-nightly-02522" />
-    <PackageReference Include="DSharpPlus.Interactivity" Version="5.0.0-nightly-02522" />
-    <PackageReference Include="DSharpPlus.Rest" Version="5.0.0-nightly-02504" />
+    <PackageReference Include="DSharpPlus" Version="5.0.0-nightly-02524" />
+    <PackageReference Include="DSharpPlus.Commands" Version="5.0.0-nightly-02524" />
+    <PackageReference Include="DSharpPlus.Interactivity" Version="5.0.0-nightly-02524" />
+    <PackageReference Include="Humanizer.Core" Version="2.14.1" />
     <PackageReference Include="Microsoft.EntityFrameworkCore" Version="9.0.6" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Abstractions" Version="9.0.6" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Analyzers" Version="9.0.6" />
@@ -43,6 +43,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Folder Include="Data\EntityTypeConfiguration\" />
     <Folder Include="SlashCommands\Member\" />
     <Folder Include="SlashCommands\Economy\" />
   </ItemGroup>
