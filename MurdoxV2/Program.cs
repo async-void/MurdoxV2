@@ -11,7 +11,6 @@ using MurdoxV2.Data.DbContext;
 using MurdoxV2.Factories;
 using MurdoxV2.Handlers;
 using MurdoxV2.Services;
-using MurdoxV2.SlashCommands.Moderation;
 using MurdoxV2.Utilities.Timestamp;
 using Serilog;
 using Serilog.Sinks.SystemConsole.Themes;

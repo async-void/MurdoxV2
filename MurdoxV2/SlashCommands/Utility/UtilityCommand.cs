@@ -27,7 +27,9 @@ namespace MurdoxV2.SlashCommands.Utility
                 new DiscordSectionComponent("Ping Information", new DiscordButtonComponent(DiscordButtonStyle.Primary, "pingBtn", "Ping")),
                 new DiscordSeparatorComponent(true, DiscordSeparatorSpacing.Large),
                 new DiscordSectionComponent(new DiscordTextDisplayComponent("Donatations help to keep Murdox online!"),
-                                        new DiscordButtonComponent(DiscordButtonStyle.Secondary, "donateBtn", "Donate"))
+                                        new DiscordButtonComponent(DiscordButtonStyle.Secondary, "donateBtn", "Donate")),
+                new DiscordSeparatorComponent(true),
+                new DiscordTextDisplayComponent($"-# Murdox ©️ {DateTime.UtcNow:ddd, MM-dd-yyyy hh:mm tt}")
             };
             var container = new DiscordContainerComponent(components, false, DiscordColor.Gray);
             var msg = new DiscordMessageBuilder()
