@@ -46,24 +46,24 @@ namespace MurdoxV2
             await Host.CreateDefaultBuilder()
                 .UseSerilog()
                 .UseConsoleLifetime()
-                
+
                 .ConfigureServices((context, services) =>
                 {
                     services.AddLogging(logging => logging.ClearProviders().AddSerilog(logger));
-                  
+
                     services.AddHostedService<BotService>()
                         .AddDiscordClient(token.Value, intents)
                         .AddCommandsExtension((options, config) =>
                         {
-                           config.AddCommands(Assembly.GetExecutingAssembly());
+                            config.AddCommands(Assembly.GetExecutingAssembly());
                         });
-                    
+
                     services.AddSingleton<IDbContextFactory<AppDbContext>>(new AppDbContextFactory(conStr.Value.ConnectionStrings!.Murdox!));
-                    
+
                     #region EVENT HANDLERS
                     services.ConfigureEventHandlers(
-                        
-                        #region SESSION CREATED
+
+                    #region SESSION CREATED
                         e => e.HandleSessionCreated((client, args) =>
                         {
                             Log.Information($"Discord Session Created...");
@@ -105,7 +105,7 @@ namespace MurdoxV2
                         })
                         #endregion
 
-                        .HandleZombied((client, args) => 
+                        .HandleZombied((client, args) =>
                         {
                             Log.Information($"Discord Zombied...");
                             return Task.CompletedTask;
@@ -116,9 +116,6 @@ namespace MurdoxV2
                 .RunConsoleAsync();
 
             await Log.CloseAndFlushAsync();
-
-            //var db = new AppDbContextFactory(conStr.Value.ConnectionStrings!.Murdox!).CreateDbContext();
-            //db.Database.Migrate();
         }
     }
 }

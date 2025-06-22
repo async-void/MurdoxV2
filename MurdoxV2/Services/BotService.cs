@@ -1,6 +1,8 @@
 ﻿using DSharpPlus;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using MurdoxV2.Data.DbContext;
 using Serilog;
 
 namespace MurdoxV2.Services
@@ -26,6 +28,7 @@ namespace MurdoxV2.Services
 
         public async Task StopAsync(CancellationToken cancellationToken)
         {
+            Log.Information("Disconnecting from Discord...");
             await dClient.DisconnectAsync();
         }
     }

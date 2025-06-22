@@ -34,11 +34,10 @@ namespace MurdoxV2.SlashCommands.Moderation
                 new DiscordSeparatorComponent(true, DiscordSeparatorSpacing.Large),
                 new DiscordTextDisplayComponent("Choose a mod command below"),
                 new DiscordSeparatorComponent(true, DiscordSeparatorSpacing.Small),
-                new DiscordSectionComponent("Purge Messages", new DiscordButtonComponent(DiscordButtonStyle.Primary, "purgeBtn", "Purge")),
-                new DiscordSeparatorComponent(true, DiscordSeparatorSpacing.Small),
-                new DiscordSectionComponent("Warn Member", new DiscordButtonComponent(DiscordButtonStyle.Primary, "warnBtn", "Warn")),
-                new DiscordSeparatorComponent(true, DiscordSeparatorSpacing.Small),
-                new DiscordSectionComponent("Ban Member", new DiscordButtonComponent(DiscordButtonStyle.Danger, "banBtn", "Ban")),
+                new DiscordActionRowComponent(btns),
+                new DiscordSeparatorComponent(true),
+                new DiscordSectionComponent(new DiscordTextDisplayComponent($"-# Murdox ©️ {DateTime.UtcNow:ddd, MM-dd-yyyy hh:mm tt}"),
+                                        new DiscordButtonComponent(DiscordButtonStyle.Secondary, "donateBtn", "Donate")),
             };
 
             var container = new DiscordContainerComponent(components, false, DiscordColor.Gray);

@@ -25,12 +25,12 @@ namespace MurdoxV2.Handlers
                             // Handle purge button interaction
                             DiscordComponent[] components =
                                [
-                                   new DiscordTextDisplayComponent($"**Purge Command**"),
-                                   new DiscordSeparatorComponent(true),
-                                   new DiscordTextDisplayComponent("this command will delete a set amount of messages from the chat history."),
-                                   new DiscordSeparatorComponent(true, DiscordSeparatorSpacing.Large),
-                                   new DiscordSectionComponent(new DiscordTextDisplayComponent("Donatations help to keep Murdox online!"), 
-                                        new DiscordButtonComponent(DiscordButtonStyle.Secondary, "donateBtn", "Donate"))
+                                  new DiscordTextDisplayComponent($"## Purge"),
+                                  new DiscordSeparatorComponent(true),
+                                  new DiscordTextDisplayComponent("this command will delete a set amount of messages from the chat history."),
+                                  new DiscordSeparatorComponent(true, DiscordSeparatorSpacing.Large),
+                                  new DiscordSectionComponent(new DiscordTextDisplayComponent($"-# Murdox ©️ {DateTime.UtcNow:ddd, MM-dd-yyyy hh:mm tt}"),
+                                     new DiscordButtonComponent(DiscordButtonStyle.Secondary, "donateBtn", "Donate"))
                                ];
                             var container = new DiscordContainerComponent(components, false, DiscordColor.DarkGray);
 
@@ -59,25 +59,6 @@ namespace MurdoxV2.Handlers
                         #region UPTIME
                         case "uptimeBtn":
                             // Handle warn button interaction
-                            var uptime = await TimestampDataProvider.GetBotUptimeAsync();
-                            components =
-                              [
-                                  new DiscordTextDisplayComponent($"# Uptime  \t<:clock:1385915131799801988>"), 
-                                  new DiscordSeparatorComponent(true, DiscordSeparatorSpacing.Large),
-                                  new DiscordTextDisplayComponent($"Murdox has been online for: {uptime}"),
-                                  new DiscordSeparatorComponent(true),
-                                  new DiscordSectionComponent(new DiscordTextDisplayComponent("Donatations help to keep Murdox online!"),
-                                        new DiscordButtonComponent(DiscordButtonStyle.Secondary, "donateBtn", "Donate")),
-                                  new DiscordSeparatorComponent(true),
-                                  new DiscordTextDisplayComponent($"-# Murdox ©️ {DateTime.UtcNow:ddd, MM-dd-yyyy hh:mm tt}")
-                              ];
-                            container = new DiscordContainerComponent(components, false, DiscordColor.Azure);
-
-                            message = new DiscordInteractionResponseBuilder()
-                            .EnableV2Components()
-                            .AddContainerComponent(container);
-
-                            await eventArgs.Interaction.CreateResponseAsync(DiscordInteractionResponseType.UpdateMessage, new DiscordInteractionResponseBuilder(message));
                             break;
                         #endregion
 
@@ -86,17 +67,15 @@ namespace MurdoxV2.Handlers
                             var lifetime = await TimestampDataProvider.GetBotUptimeAsync();
                             components =
                               [
-                                  new DiscordTextDisplayComponent($"# Ping Command"),
+                                  new DiscordTextDisplayComponent($"# Ping"),
                                   new DiscordSeparatorComponent(true),
                                   new DiscordTextDisplayComponent($"Ping is a wip, the bot devs are working on this feature."),
                                   new DiscordTextDisplayComponent($"Uptime: {lifetime}"),
                                   new DiscordTextDisplayComponent($"Discord: "),
                                   new DiscordTextDisplayComponent($"DB: "),
                                   new DiscordSeparatorComponent(true, DiscordSeparatorSpacing.Large),
-                                  new DiscordSectionComponent(new DiscordTextDisplayComponent("Donatations help to keep Murdox online!"),
+                                  new DiscordSectionComponent(new DiscordTextDisplayComponent($"-# Murdox ©️ {DateTime.UtcNow:ddd, MM-dd-yyyy hh:mm tt}"),
                                         new DiscordButtonComponent(DiscordButtonStyle.Secondary, "donateBtn", "Donate")),
-                                  new DiscordSeparatorComponent(true),
-                                  new DiscordTextDisplayComponent($"-# Murdox ©️ {DateTime.UtcNow:ddd, MM-dd-yyyy hh:mm tt}")
                               ];
                             container = new DiscordContainerComponent(components, false, DiscordColor.Grayple);
 
