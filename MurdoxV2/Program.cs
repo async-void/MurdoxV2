@@ -10,16 +10,19 @@ using Microsoft.Extensions.Logging;
 using MurdoxV2.Data.DbContext;
 using MurdoxV2.Factories;
 using MurdoxV2.Handlers;
+using MurdoxV2.Interfaces;
 using MurdoxV2.Services;
 using MurdoxV2.Utilities.Timestamp;
 using Serilog;
 using Serilog.Sinks.SystemConsole.Themes;
 using System.Reflection;
+using System.Runtime.CompilerServices;
 
 namespace MurdoxV2
 {
     internal class Program
     {
+        private static readonly Dictionary<string, int> _userRank = [];
         static async Task Main(string[] args)
         {
             var configService = new ConfigurationDataServiceProvider();
@@ -59,11 +62,13 @@ namespace MurdoxV2
                         });
 
                     services.AddSingleton<IDbContextFactory<AppDbContext>>(new AppDbContextFactory(conStr.Value.ConnectionStrings!.Murdox!));
+                    services.AddSingleton<IMemberData, MemberDataServiceProvider>();
+                    services.AddSingleton<IReminderData, ReminderServiceDataProvider>();
 
                     #region EVENT HANDLERS
                     services.ConfigureEventHandlers(
 
-                    #region SESSION CREATED
+                        #region SESSION CREATED
                         e => e.HandleSessionCreated((client, args) =>
                         {
                             Log.Information($"Discord Session Created...");
@@ -73,6 +78,22 @@ namespace MurdoxV2
 
                         .AddEventHandlers<InteractionEventHandler>(ServiceLifetime.Singleton)
 
+                        #region MESSAGE CREATED
+                        .HandleMessageCreated(async (client, args) =>
+                        {
+                            if (args.Author.IsBot) return;
+                           
+                            //using var db = new AppDbContextFactory(conStr.Value.ConnectionStrings.Murdox!).CreateDbContext();
+                            if (!_userRank.ContainsKey(args.Author.Id.ToString()))
+                            {
+                                _userRank.Add(args.Author.Id.ToString(), 1);
+                            }
+                            else
+                            {
+                                _userRank[args.Author.Id.ToString()]++;
+                            }
+                        })
+                        #endregion
                         #region SOCKETS
                         .HandleSocketClosed((s, e) =>
                         {
@@ -105,16 +126,19 @@ namespace MurdoxV2
                         })
                         #endregion
 
+                        #region ZOMBIED
                         .HandleZombied((client, args) =>
                         {
                             Log.Information($"Discord Zombied...");
                             return Task.CompletedTask;
                         })
+                        #endregion
                     );
                     #endregion
                 })
-                .RunConsoleAsync();
-
+                .RunConsoleAsync(); 
+            
+            await MemberDataServiceProvider.SaveMemberDataOnCloseAsync(_userRank);
             await Log.CloseAndFlushAsync();
         }
     }

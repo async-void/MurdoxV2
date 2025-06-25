@@ -12,7 +12,7 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace MurdoxV2.Data.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    [Migration("20250618212331_Initial")]
+    [Migration("20250622215931_Initial")]
     partial class Initial
     {
         /// <inheritdoc />
@@ -53,6 +53,31 @@ namespace MurdoxV2.Data.Migrations
                     b.ToTable("Bank");
                 });
 
+            modelBuilder.Entity("MurdoxV2.Models.Reminder", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Content")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("MemberId")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("MemberId");
+
+                    b.ToTable("Reminder");
+                });
+
             modelBuilder.Entity("MurdoxV2.Models.ServerMember", b =>
                 {
                     b.Property<int>("Id")
@@ -83,6 +108,10 @@ namespace MurdoxV2.Data.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
+                    b.Property<string>("GuildId")
+                        .IsRequired()
+                        .HasColumnType("text");
+
                     b.Property<bool?>("IsBanned")
                         .HasColumnType("boolean");
 
@@ -95,25 +124,32 @@ namespace MurdoxV2.Data.Migrations
                     b.Property<DateTimeOffset?>("JoinedAt")
                         .HasColumnType("timestamp with time zone");
 
-                    b.Property<DateTimeOffset?>("LastActiveAt")
-                        .HasColumnType("timestamp with time zone");
-
                     b.Property<string>("Nickname")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<string>("ServerId")
                         .IsRequired()
                         .HasColumnType("text");
 
                     b.Property<string>("UserStatus")
                         .HasColumnType("text");
 
+                    b.Property<int>("XP")
+                        .HasColumnType("integer");
+
                     b.HasKey("Id");
 
                     b.HasIndex("BankId");
 
                     b.ToTable("Members");
+                });
+
+            modelBuilder.Entity("MurdoxV2.Models.Reminder", b =>
+                {
+                    b.HasOne("MurdoxV2.Models.ServerMember", "Member")
+                        .WithMany("Reminders")
+                        .HasForeignKey("MemberId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Member");
                 });
 
             modelBuilder.Entity("MurdoxV2.Models.ServerMember", b =>
@@ -130,6 +166,11 @@ namespace MurdoxV2.Data.Migrations
             modelBuilder.Entity("MurdoxV2.Models.Bank", b =>
                 {
                     b.Navigation("Members");
+                });
+
+            modelBuilder.Entity("MurdoxV2.Models.ServerMember", b =>
+                {
+                    b.Navigation("Reminders");
                 });
 #pragma warning restore 612, 618
         }

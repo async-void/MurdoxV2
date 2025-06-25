@@ -12,5 +12,6 @@ namespace MurdoxV2.Enums
         INFORMATION,
         WARNING,
         FATAL,
+        NOTFOUND,
     }
 }

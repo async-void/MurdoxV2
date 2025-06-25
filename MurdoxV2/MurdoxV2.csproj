@@ -44,7 +44,6 @@
 
   <ItemGroup>
     <Folder Include="Data\EntityTypeConfiguration\" />
-    <Folder Include="SlashCommands\Member\" />
     <Folder Include="SlashCommands\Economy\" />
   </ItemGroup>
 
