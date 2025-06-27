@@ -42,10 +42,5 @@ namespace MurdoxV2.Services
         {
             throw new NotImplementedException();
         }
-
-        public static async Task<Result<bool, SystemError<MemberDataServiceProvider>>> SaveMemberDataOnCloseAsync(Dictionary<string, int> userData)
-        {
-            throw new NotImplementedException();
-        }
     }
 }

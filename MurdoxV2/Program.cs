@@ -11,7 +11,9 @@ using MurdoxV2.Data.DbContext;
 using MurdoxV2.Factories;
 using MurdoxV2.Handlers;
 using MurdoxV2.Interfaces;
+using MurdoxV2.Models;
 using MurdoxV2.Services;
+using MurdoxV2.Utilities.OnAppClosing;
 using MurdoxV2.Utilities.Timestamp;
 using Serilog;
 using Serilog.Sinks.SystemConsole.Themes;
@@ -22,7 +24,7 @@ namespace MurdoxV2
 {
     internal class Program
     {
-        private static readonly Dictionary<string, int> _userRank = [];
+        private static readonly Dictionary<ServerMember, int> _userRank = [];
         static async Task Main(string[] args)
         {
             var configService = new ConfigurationDataServiceProvider();
@@ -39,7 +41,7 @@ namespace MurdoxV2
             var intents = TextCommandProcessor.RequiredIntents | SlashCommandProcessor.RequiredIntents | DiscordIntents.All;
 
             var logger = Log.Logger = new LoggerConfiguration()
-                .MinimumLevel.Verbose()
+                .MinimumLevel.Debug()
                 .MinimumLevel.Override("System.Net.Http", Serilog.Events.LogEventLevel.Error)
                 .WriteTo.Console(theme: AnsiConsoleTheme.Code, outputTemplate: "[{Timestamp:yyyy-MM-dd hh:mm:ss.fff tt zzz} {SourceContext} {Level:u3}] {Message:lj}{NewLine}")
                 .WriteTo.File(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Data", "TextFiles", "Logs", "bot_logs.txt"), rollingInterval: RollingInterval.Day,
@@ -50,6 +52,7 @@ namespace MurdoxV2
                 .UseSerilog()
                 .UseConsoleLifetime()
 
+            #region CONFIGURE SERVICES
                 .ConfigureServices((context, services) =>
                 {
                     services.AddLogging(logging => logging.ClearProviders().AddSerilog(logger));
@@ -83,17 +86,9 @@ namespace MurdoxV2
                         {
                             if (args.Author.IsBot) return;
                            
-                            //using var db = new AppDbContextFactory(conStr.Value.ConnectionStrings.Murdox!).CreateDbContext();
-                            if (!_userRank.ContainsKey(args.Author.Id.ToString()))
-                            {
-                                _userRank.Add(args.Author.Id.ToString(), 1);
-                            }
-                            else
-                            {
-                                _userRank[args.Author.Id.ToString()]++;
-                            }
                         })
                         #endregion
+
                         #region SOCKETS
                         .HandleSocketClosed((s, e) =>
                         {
@@ -136,10 +131,13 @@ namespace MurdoxV2
                     );
                     #endregion
                 })
-                .RunConsoleAsync(); 
-            
-            await MemberDataServiceProvider.SaveMemberDataOnCloseAsync(_userRank);
+                .RunConsoleAsync();
+
+            var cleanuo = new CleanUp(new AppDbContextFactory(conStr.Value.ConnectionStrings!.Murdox!));
+            await cleanuo.SaveMemberDataOnCloseAsync(_userRank);
             await Log.CloseAndFlushAsync();
+
+            #endregion
         }
     }
 }

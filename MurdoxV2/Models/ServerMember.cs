@@ -23,7 +23,7 @@ namespace MurdoxV2.Models
         public bool? IsBot { get; set; }
         public bool? IsMuted { get; set; }
         public bool? IsBanned { get; set; }
-        public List<DiscordMessage>? Messages { get; set; }
+        public int MessageCount { get; set; }
 
         public int BankId { get; set; } //Foreign Key
         public Bank? Bank { get; set; } //Navigation Property One Bank to Many ServerMembers

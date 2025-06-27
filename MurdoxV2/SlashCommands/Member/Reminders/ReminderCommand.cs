@@ -37,10 +37,32 @@ namespace MurdoxV2.SlashCommands.Member.Reminders
                 CompleteAt = DateTime.UtcNow.AddMilliseconds((long)duration.Value),
                 Duration = TimeSpan.FromMilliseconds((long)duration.Value),
             };
-            
+
             var msg = new DiscordMessageBuilder()
                 .WithContent($"Reminder set for {reminder.CompleteAt} with message: {message}");
             await ctx.RespondAsync(msg);
+        }
+
+        [Command("list")]
+        [Description("List all reminders for the member.")]
+        public async Task ListRemindersAsync(CommandContext ctx)
+        {
+            await ctx.DeferResponseAsync();
+            var remindersResult = await reminderData.GetMemberRemindersAsync(ctx.Guild!.Id.ToString(), ctx.User.Id.ToString());
+            if (!remindersResult.IsOk)
+            {
+                await ctx.RespondAsync($"Error retrieving reminders: {remindersResult.Error.ErrorMessage}");
+                return;
+            }
+            var reminders = remindersResult.Value;
+            if (reminders.Count == 0)
+            {
+                await ctx.RespondAsync("You have no reminders set.");
+                return;
+            }
+            var response = new DiscordMessageBuilder()
+                .WithContent("Your reminders:\n" + string.Join("\n", reminders.Select(r => $"{r.Id}: {r.Content} (Due: {r.CompleteAt})")));
+            await ctx.RespondAsync(response);
         }
     }
 }

@@ -44,6 +44,7 @@
 
   <ItemGroup>
     <Folder Include="Data\EntityTypeConfiguration\" />
+    <Folder Include="Data\Migrations\" />
     <Folder Include="SlashCommands\Economy\" />
   </ItemGroup>
 

@@ -27,6 +27,7 @@ namespace MurdoxV2.SlashCommands.Moderation
         [Description("remove a set number of messages from the channel (100 max)")]
         public async Task Purge(CommandContext ctx, [Parameter("amount")] int amount)
         {
+           
             await foreach (var message in ctx.Channel.GetMessagesAsync(amount))
             {
                 await ctx.Channel.DeleteMessageAsync(message);

@@ -58,12 +58,26 @@ namespace MurdoxV2.Data.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
+                    b.Property<string>("ChannelId")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<DateTime>("CompleteAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<string>("Content")
                         .IsRequired()
                         .HasColumnType("text");
 
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
+
+                    b.Property<TimeSpan>("Duration")
+                        .HasColumnType("interval");
+
+                    b.Property<string>("GuildId")
+                        .IsRequired()
+                        .HasColumnType("text");
 
                     b.Property<int>("MemberId")
                         .HasColumnType("integer");
@@ -120,6 +134,9 @@ namespace MurdoxV2.Data.Migrations
 
                     b.Property<DateTimeOffset?>("JoinedAt")
                         .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("MessageCount")
+                        .HasColumnType("integer");
 
                     b.Property<string>("Nickname")
                         .IsRequired()

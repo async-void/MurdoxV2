@@ -13,6 +13,5 @@ namespace MurdoxV2.Interfaces
         Task<Result<ServerMember, SystemError<MemberDataServiceProvider>>> GetMemberAsync(string guildId, string discordId);
         Task<Result<bool, SystemError<MemberDataServiceProvider>>> UpdateMemberAsync(ServerMember mem);
         Task<Result<bool, SystemError<MemberDataServiceProvider>>> SaveMemberAsync(ServerMember mem);
-
     }
 }

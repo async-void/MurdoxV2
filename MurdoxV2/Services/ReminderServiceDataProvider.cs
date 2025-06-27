@@ -8,21 +8,40 @@ namespace MurdoxV2.Services
 {
     public class ReminderServiceDataProvider(IDbContextFactory<AppDbContext> dbFactory) : IReminderData
     {
+        private readonly IDbContextFactory<AppDbContext> _dbFactory = dbFactory;
+
+        #region BULK DELETE MEMBER REMINDERS
         public Task<Result<bool, SystemError<ReminderDataServiceProvider>>> BulkDeleteMemberRemindersAsync(string guildId, string discordId, List<Reminder> reminders)
         {
             throw new NotImplementedException();
-        }
+        } 
+        #endregion
 
+        #region DELETE MEMBER REMINDER
         public Task<Result<bool, SystemError<ReminderDataServiceProvider>>> DeleteMemberReminderAsync(string guildId, string discordId, int reminderId)
         {
             throw new NotImplementedException();
-        }
+        } 
+        #endregion
 
-        public Task<Result<List<Reminder>, SystemError<ReminderDataServiceProvider>>> GetMemberRemindersAsync(string guildId, string discordId)
+        #region GET MEMBER REMINDERS
+        public async Task<Result<List<Reminder>, SystemError<ReminderDataServiceProvider>>> GetMemberRemindersAsync(string guildId, string discordId)
         {
-            throw new NotImplementedException();
-        }
+            var db = _dbFactory.CreateDbContext();
+            var reminders = await db.Reminders.Where(m => m.MemberId.Equals(discordId) && m.GuildId.Equals(guildId)).ToListAsync();
+            if (reminders.Count > 0)
+                return Result<List<Reminder>, SystemError<ReminderDataServiceProvider>>.Ok(reminders);
 
+            return Result<List<Reminder>, SystemError<ReminderDataServiceProvider>>.Err(new SystemError<ReminderDataServiceProvider>
+            {
+                ErrorMessage = "No reminders found for this member.",
+                ErrorType = Enums.ErrorType.INFORMATION,
+                CreatedAt = DateTime.UtcNow,
+            });
+        } 
+        #endregion
+
+        #region PARSE TIME STRING
         public Result<int, SystemError<ReminderDataServiceProvider>> ParseTimeString(string input)
         {
             var totalMilliseconds = 0;
@@ -51,12 +70,14 @@ namespace MurdoxV2.Services
             }
             return Result<int, SystemError<ReminderDataServiceProvider>>.Ok(totalMilliseconds);
         }
+        #endregion
 
+        #region SAVE MEMBER REMINDER
         public async Task<Result<bool, SystemError<ReminderDataServiceProvider>>> SaveMemberRemindersAsync(string guildId, string discordId, Reminder reminder)
         {
-            using var db = dbFactory.CreateDbContext();
-            var savedReminder = await db.Reminders.FirstOrDefaultAsync(r => r.Member!.DiscordId.Equals(discordId) 
-                                    && r.GuildId.Equals(guildId) && r.Content.Equals(reminder.Content));
+            using var db = _dbFactory.CreateDbContext();
+            var savedReminder = db.Reminders.Where(r => r.Member!.DiscordId.Equals(discordId)
+                                    && r.GuildId.Equals(guildId) && r.Content.Equals(reminder.Content)).ToList();
 
             if (savedReminder is not null)
                 return Result<bool, SystemError<ReminderDataServiceProvider>>.Err(
@@ -69,6 +90,7 @@ namespace MurdoxV2.Services
             await db.Reminders.AddAsync(reminder);
             await db.SaveChangesAsync();
             return Result<bool, SystemError<ReminderDataServiceProvider>>.Ok(true);
-        }
+        } 
+        #endregion
     }
 }

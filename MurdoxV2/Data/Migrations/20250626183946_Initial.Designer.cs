@@ -12,7 +12,7 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace MurdoxV2.Data.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    [Migration("20250622215931_Initial")]
+    [Migration("20250626183946_Initial")]
     partial class Initial
     {
         /// <inheritdoc />
@@ -61,12 +61,26 @@ namespace MurdoxV2.Data.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
+                    b.Property<string>("ChannelId")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<DateTime>("CompleteAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<string>("Content")
                         .IsRequired()
                         .HasColumnType("text");
 
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
+
+                    b.Property<TimeSpan>("Duration")
+                        .HasColumnType("interval");
+
+                    b.Property<string>("GuildId")
+                        .IsRequired()
+                        .HasColumnType("text");
 
                     b.Property<int>("MemberId")
                         .HasColumnType("integer");
@@ -75,7 +89,7 @@ namespace MurdoxV2.Data.Migrations
 
                     b.HasIndex("MemberId");
 
-                    b.ToTable("Reminder");
+                    b.ToTable("Reminders");
                 });
 
             modelBuilder.Entity("MurdoxV2.Models.ServerMember", b =>
@@ -123,6 +137,9 @@ namespace MurdoxV2.Data.Migrations
 
                     b.Property<DateTimeOffset?>("JoinedAt")
                         .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("MessageCount")
+                        .HasColumnType("integer");
 
                     b.Property<string>("Nickname")
                         .IsRequired()

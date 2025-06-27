@@ -64,14 +64,20 @@ namespace MurdoxV2.SlashCommands.Utility
             sw.Stop();
 
             var dbLatencyString = dbPing > 1000 ? $"{dbPing / 1000.0:F2} seconds" : $"{dbPing} ms";
-            var discordLatency = gatewayLatency > 1000 ? $"{discordPing / 1000.0:F2} seconds" : $"{discordPing} ms";
+            var discordLatency = gatewayLatency > 1000 ? $"{discordPing / 1000.0:F2} seconds" : $"{gatewayLatency} ms";
+           
+            var guildCount = ctx.Client.Guilds.Count;
+
+            var sb = new StringBuilder();
+            sb.Append($"### Latency:\r\n-db: {dbLatencyString}\r\n");
+            sb.Append($"-gateway: {discordLatency}\r\n");
+            sb.Append($"### Info: \r\n-url: [Murdox](https://top.gg/bot/991070265578516561)\r\n-shards: {gatewayInfo.ShardCount}\r\n-guilds: {guildCount}");
 
             DiscordComponent[] components =
               [
                   new DiscordTextDisplayComponent($"# Ping"),
                   new DiscordSeparatorComponent(true, DiscordSeparatorSpacing.Large),
-                  new DiscordTextDisplayComponent($"Database Latency: {dbLatencyString}"),
-                  new DiscordTextDisplayComponent($"Gateway Latency: {gatewayLatency} ms"),
+                  new DiscordTextDisplayComponent(sb.ToString()),
                   new DiscordSeparatorComponent(true),
                   new DiscordSectionComponent(new DiscordTextDisplayComponent($"-# Murdox ©️ {DateTime.UtcNow:ddd, MM-dd-yyyy hh:mm tt}"),
                         new DiscordButtonComponent(DiscordButtonStyle.Secondary, "donateBtn", "Donate")),

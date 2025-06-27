@@ -18,6 +18,5 @@ namespace MurdoxV2.Models
 
         public int MemberId { get; set; }
         public ServerMember? Member { get; set; }
-
     }
 }

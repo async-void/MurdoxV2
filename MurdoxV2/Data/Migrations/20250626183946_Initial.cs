@@ -48,6 +48,7 @@ namespace MurdoxV2.Data.Migrations
                     IsBot = table.Column<bool>(type: "boolean", nullable: true),
                     IsMuted = table.Column<bool>(type: "boolean", nullable: true),
                     IsBanned = table.Column<bool>(type: "boolean", nullable: true),
+                    MessageCount = table.Column<int>(type: "integer", nullable: false),
                     BankId = table.Column<int>(type: "integer", nullable: false)
                 },
                 constraints: table =>
@@ -62,20 +63,24 @@ namespace MurdoxV2.Data.Migrations
                 });
 
             migrationBuilder.CreateTable(
-                name: "Reminder",
+                name: "Reminders",
                 columns: table => new
                 {
                     Id = table.Column<int>(type: "integer", nullable: false)
                         .Annotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.IdentityByDefaultColumn),
                     Content = table.Column<string>(type: "text", nullable: false),
+                    GuildId = table.Column<string>(type: "text", nullable: false),
+                    ChannelId = table.Column<string>(type: "text", nullable: false),
+                    Duration = table.Column<TimeSpan>(type: "interval", nullable: false),
                     CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
+                    CompleteAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
                     MemberId = table.Column<int>(type: "integer", nullable: false)
                 },
                 constraints: table =>
                 {
-                    table.PrimaryKey("PK_Reminder", x => x.Id);
+                    table.PrimaryKey("PK_Reminders", x => x.Id);
                     table.ForeignKey(
-                        name: "FK_Reminder_Members_MemberId",
+                        name: "FK_Reminders_Members_MemberId",
                         column: x => x.MemberId,
                         principalTable: "Members",
                         principalColumn: "Id",
@@ -88,8 +93,8 @@ namespace MurdoxV2.Data.Migrations
                 column: "BankId");
 
             migrationBuilder.CreateIndex(
-                name: "IX_Reminder_MemberId",
-                table: "Reminder",
+                name: "IX_Reminders_MemberId",
+                table: "Reminders",
                 column: "MemberId");
         }
 
@@ -97,7 +102,7 @@ namespace MurdoxV2.Data.Migrations
         protected override void Down(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.DropTable(
-                name: "Reminder");
+                name: "Reminders");
 
             migrationBuilder.DropTable(
                 name: "Members");
