@@ -10,11 +10,11 @@ namespace MurdoxV2.Interfaces
 {
     public interface IReminderData
     {
-        Result<int, SystemError<ReminderDataServiceProvider>> ParseTimeString(string input);
-        Task<Result<List<Reminder>, SystemError<ReminderDataServiceProvider>>> GetMemberRemindersAsync(string guildId, string discordId);
-        Task<Result<bool, SystemError<ReminderDataServiceProvider>>> SaveMemberRemindersAsync(string guildId, string discordId, Reminder reminder);
-        Task<Result<bool, SystemError<ReminderDataServiceProvider>>> DeleteMemberReminderAsync(string guildId, string discordId, int reminderId);
-        Task<Result<bool, SystemError<ReminderDataServiceProvider>>> BulkDeleteMemberRemindersAsync(string guildId, string discordId, List<Reminder> reminders);
+        Result<int, SystemError<ReminderServiceDataProvider>> ParseTimeString(string input);
+        Task<Result<List<Reminder>, SystemError<ReminderServiceDataProvider>>> GetMemberRemindersAsync(string guildId, string discordId);
+        Task<Result<bool, SystemError<ReminderServiceDataProvider>>> SaveMemberRemindersAsync(string guildId, string discordId, Reminder reminder);
+        Task<Result<bool, SystemError<ReminderServiceDataProvider>>> DeleteMemberReminderAsync(string guildId, string discordId, int reminderId);
+        Task<Result<bool, SystemError<ReminderServiceDataProvider>>> BulkDeleteMemberRemindersAsync(string guildId, string discordId, List<Reminder> reminders);
 
     }
 }

@@ -18,6 +18,8 @@ namespace MurdoxV2.SlashCommands.Utility
     [Description("Utility commands for various functionalities")]
     public class UtilityCommands(IDbContextFactory<AppDbContext> dbFactory)
     {
+
+        #region UPTIME
         [Command("uptime")]
         [Description("the time Murdox has been online since the last restart")]
         public async Task UptimeAsync(CommandContext ctx)
@@ -40,10 +42,12 @@ namespace MurdoxV2.SlashCommands.Utility
             var msg = new DiscordMessageBuilder()
                 .EnableV2Components()
                 .AddContainerComponent(container);
-                
+
             await ctx.EditResponseAsync(msg);
         }
+        #endregion
 
+        #region PING
         [Command("ping")]
         [Description("get latency info for the system")]
         public async Task PingAsync(CommandContext ctx)
@@ -65,13 +69,13 @@ namespace MurdoxV2.SlashCommands.Utility
 
             var dbLatencyString = dbPing > 1000 ? $"{dbPing / 1000.0:F2} seconds" : $"{dbPing} ms";
             var discordLatency = gatewayLatency > 1000 ? $"{discordPing / 1000.0:F2} seconds" : $"{gatewayLatency} ms";
-           
+
             var guildCount = ctx.Client.Guilds.Count;
 
             var sb = new StringBuilder();
             sb.Append($"### Latency:\r\n-db: {dbLatencyString}\r\n");
             sb.Append($"-gateway: {discordLatency}\r\n");
-            sb.Append($"### Info: \r\n-url: [Murdox](https://top.gg/bot/991070265578516561)\r\n-shards: {gatewayInfo.ShardCount}\r\n-guilds: {guildCount}");
+            sb.Append($"### Info: \r\n[Murdox](https://top.gg/bot/991070265578516561)\r\n-shards: {gatewayInfo.ShardCount}\r\n-guilds: {guildCount}");
 
             DiscordComponent[] components =
               [
@@ -89,6 +93,7 @@ namespace MurdoxV2.SlashCommands.Utility
                 .AddContainerComponent(container);
 
             await ctx.EditResponseAsync(msg);
-        }
+        } 
+        #endregion
     }
 }

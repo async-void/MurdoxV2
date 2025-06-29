@@ -15,6 +15,8 @@ using MurdoxV2.Models;
 using MurdoxV2.Services;
 using MurdoxV2.Utilities.OnAppClosing;
 using MurdoxV2.Utilities.Timestamp;
+using Quartz;
+using Quartz.Impl;
 using Serilog;
 using Serilog.Sinks.SystemConsole.Themes;
 using System.Reflection;
@@ -67,6 +69,33 @@ namespace MurdoxV2
                     services.AddSingleton<IDbContextFactory<AppDbContext>>(new AppDbContextFactory(conStr.Value.ConnectionStrings!.Murdox!));
                     services.AddSingleton<IMemberData, MemberDataServiceProvider>();
                     services.AddSingleton<IReminderData, ReminderServiceDataProvider>();
+                    services.AddSingleton<IReminder, ReminderService>();
+
+                    #region QUARTS
+                    services.AddQuartz(q =>
+                    {
+                        q.ScheduleJob<SchedulerService>(trigger => trigger
+                            .WithIdentity("ReminderJob")
+                            .StartNow()
+                            .WithSimpleSchedule(x => x.WithInterval(TimeSpan.FromSeconds(10)).RepeatForever()));
+
+                        var jobKey = new JobKey("ReminderJob", "group1");
+                        q.AddJob<SchedulerService>(jobKey, j => j
+                            .WithDescription("my awesome job"));
+
+                        q.AddTrigger(t => t
+                         .WithIdentity("Simple Trigger")
+                         .ForJob(jobKey)
+                         .StartNow()
+                         .WithSimpleSchedule(x => x.WithInterval(TimeSpan.FromSeconds(10)).RepeatForever())
+                         .WithDescription("my awesome simple trigger"));
+                    });
+                    services.AddQuartzHostedService(opt =>
+                    {
+                        opt.WaitForJobsToComplete = true;
+                    });
+                    services.AddTransient<SchedulerService>();
+                    #endregion
 
                     #region EVENT HANDLERS
                     services.ConfigureEventHandlers(
@@ -132,7 +161,7 @@ namespace MurdoxV2
                     #endregion
                 })
                 .RunConsoleAsync();
-
+            
             var cleanuo = new CleanUp(new AppDbContextFactory(conStr.Value.ConnectionStrings!.Murdox!));
             await cleanuo.SaveMemberDataOnCloseAsync(_userRank);
             await Log.CloseAndFlushAsync();

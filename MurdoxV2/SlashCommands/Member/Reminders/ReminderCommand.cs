@@ -1,5 +1,7 @@
 ﻿using DSharpPlus.Commands;
 using DSharpPlus.Entities;
+using Humanizer;
+using Humanizer.Localisation;
 using MurdoxV2.Interfaces;
 using MurdoxV2.Models;
 using System.ComponentModel;
@@ -8,8 +10,9 @@ namespace MurdoxV2.SlashCommands.Member.Reminders
 {
     [Command("reminder")]
     [Description("Manage member reminders.")]
-    public class ReminderCommand(IReminderData reminderData)
+    public class ReminderCommand(IReminderData reminderData, IReminder reminderService)
     {
+        #region REMIND
         [Command("remind")]
         [Description("Set a reminder")]
         public async Task SetReminderAsync(CommandContext ctx,
@@ -18,6 +21,17 @@ namespace MurdoxV2.SlashCommands.Member.Reminders
         {
             await ctx.DeferResponseAsync();
             var duration = reminderData.ParseTimeString(time);
+            var timestamp = DateTimeOffset.UtcNow.AddMilliseconds(duration.Value);
+            var unixTimestamp = timestamp.ToUnixTimeSeconds();
+            var discordTimestamp = $"<t:{unixTimestamp}:R>";
+
+            var bank = new Bank()
+            {
+                Balance = 100,
+                Deposit_Amount = 100,
+                Deposit_Timestamp = DateTime.UtcNow,    
+            };
+
             var member = new ServerMember()
             {
                 GuildId = ctx.Guild!.Id.ToString(),
@@ -26,6 +40,7 @@ namespace MurdoxV2.SlashCommands.Member.Reminders
                 Discriminator = ctx.User.Discriminator,
                 Nickname = ctx.Member?.Nickname ?? ctx.User.Username,
                 AvatarUrl = ctx.User.AvatarUrl ?? ctx.User.DefaultAvatarUrl,
+                Bank = bank,
             };
             var reminder = new Reminder
             {
@@ -37,12 +52,34 @@ namespace MurdoxV2.SlashCommands.Member.Reminders
                 CompleteAt = DateTime.UtcNow.AddMilliseconds((long)duration.Value),
                 Duration = TimeSpan.FromMilliseconds((long)duration.Value),
             };
+            var reminderResult = await reminderService.SaveReminderAsync(reminder);
 
-            var msg = new DiscordMessageBuilder()
-                .WithContent($"Reminder set for {reminder.CompleteAt} with message: {message}");
-            await ctx.RespondAsync(msg);
+            if (reminderResult.IsOk)
+            {
+                DiscordComponent[] components =
+                {
+                    new DiscordTextDisplayComponent($"**Reminder** {message} set!"),
+                    new DiscordSeparatorComponent(true),
+                    new DiscordTextDisplayComponent($"I will remind you {discordTimestamp}"),
+                    new DiscordSeparatorComponent(true, DiscordSeparatorSpacing.Large),
+                    new DiscordSectionComponent(new DiscordTextDisplayComponent($"Murdox ©️ {DateTime.UtcNow.Year}"),
+                        new DiscordButtonComponent(DiscordButtonStyle.Primary, "donateBtn", "Donate"))
+                };
+
+                var container = new DiscordContainerComponent(components, false, DiscordColor.Teal);
+                var msg = new DiscordMessageBuilder()
+                    .EnableV2Components()
+                    .AddContainerComponent(container);
+                await ctx.RespondAsync(msg);
+            }
+            else
+                await ctx.RespondAsync($"Error setting reminder: {reminderResult.Error.ErrorMessage}");
+
+
         }
+        #endregion
 
+        #region LIST
         [Command("list")]
         [Description("List all reminders for the member.")]
         public async Task ListRemindersAsync(CommandContext ctx)
@@ -63,6 +100,7 @@ namespace MurdoxV2.SlashCommands.Member.Reminders
             var response = new DiscordMessageBuilder()
                 .WithContent("Your reminders:\n" + string.Join("\n", reminders.Select(r => $"{r.Id}: {r.Content} (Due: {r.CompleteAt})")));
             await ctx.RespondAsync(response);
-        }
+        } 
+        #endregion
     }
 }
