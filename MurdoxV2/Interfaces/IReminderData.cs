@@ -15,6 +15,6 @@ namespace MurdoxV2.Interfaces
         Task<Result<bool, SystemError<ReminderServiceDataProvider>>> SaveMemberRemindersAsync(string guildId, string discordId, Reminder reminder);
         Task<Result<bool, SystemError<ReminderServiceDataProvider>>> DeleteMemberReminderAsync(string guildId, string discordId, int reminderId);
         Task<Result<bool, SystemError<ReminderServiceDataProvider>>> BulkDeleteMemberRemindersAsync(string guildId, string discordId, List<Reminder> reminders);
-
+        Task<Result<bool, SystemError<ReminderService>>> UpdateMemberReminderAsync(Reminder reminder);
     }
 }

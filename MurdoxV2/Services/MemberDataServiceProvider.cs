@@ -18,7 +18,6 @@ namespace MurdoxV2.Services
         {
             var db = _dbFactory.CreateDbContext();
             var mem = await db.Members
-                .AsNoTracking()
                 .FirstOrDefaultAsync(m => m.GuildId.Equals(guildId) && m.DiscordId.Equals(discordId));
 
             return mem is not null

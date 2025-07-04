@@ -27,10 +27,12 @@ namespace MurdoxV2.SlashCommands.Moderation
         [Description("remove a set number of messages from the channel (100 max)")]
         public async Task Purge(CommandContext ctx, [Parameter("amount")] int amount)
         {
-           
+            var rnd = new Random();
             await foreach (var message in ctx.Channel.GetMessagesAsync(amount))
             {
+                var delay = rnd.Next(100, 300);
                 await ctx.Channel.DeleteMessageAsync(message);
+                await Task.Delay(delay);
             }
 
             var components = new DiscordComponent[]

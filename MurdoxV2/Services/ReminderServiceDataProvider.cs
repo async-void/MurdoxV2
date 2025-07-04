@@ -1,5 +1,6 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using MurdoxV2.Data.DbContext;
+using MurdoxV2.Enums;
 using MurdoxV2.Interfaces;
 using MurdoxV2.Models;
 using System.Text.RegularExpressions;
@@ -28,7 +29,7 @@ namespace MurdoxV2.Services
         public async Task<Result<List<Reminder>, SystemError<ReminderServiceDataProvider>>> GetMemberRemindersAsync(string guildId, string discordId)
         {
             var db = _dbFactory.CreateDbContext();
-            var reminders = await db.Reminders.Where(m => m.MemberId.Equals(discordId) && m.GuildId.Equals(guildId)).ToListAsync();
+            var reminders = await db.Reminders.Where(m => m.DiscordId.Equals(discordId) && m.GuildId.Equals(guildId)).ToListAsync();
             if (reminders.Count > 0)
                 return Result<List<Reminder>, SystemError<ReminderServiceDataProvider>>.Ok(reminders);
 
@@ -38,7 +39,28 @@ namespace MurdoxV2.Services
                 ErrorType = Enums.ErrorType.INFORMATION,
                 CreatedAt = DateTime.UtcNow,
             });
-        } 
+        }
+        #endregion
+
+        #region UPDATE REMINDER
+        public async Task<Result<bool, SystemError<ReminderService>>> UpdateMemberReminderAsync(Reminder reminder)
+        {
+            var db = _dbFactory.CreateDbContext();
+            var r = await db.Reminders.FindAsync(reminder.Id);
+            if (r is not null)
+            {
+                r.IsComplete = true;
+                db.Update(r);
+                await db.SaveChangesAsync();
+                return Result<bool, SystemError<ReminderService>>.Ok(true);
+            }
+            return Result<bool, SystemError<ReminderService>>.Err(new SystemError<ReminderService>
+            {
+                ErrorMessage = "could not update reminder.",
+                ErrorType = ErrorType.INFORMATION,
+                CreatedAt = DateTimeOffset.UtcNow,
+            });
+        }
         #endregion
 
         #region PARSE TIME STRING
@@ -79,7 +101,7 @@ namespace MurdoxV2.Services
         public async Task<Result<bool, SystemError<ReminderServiceDataProvider>>> SaveMemberRemindersAsync(string guildId, string discordId, Reminder reminder)
         {
             using var db = _dbFactory.CreateDbContext();
-            var savedReminder = db.Reminders.Where(r => r.Member!.DiscordId.Equals(discordId)
+            var savedReminder = db.Reminders.Where(r => r.DiscordId.Equals(discordId)
                                     && r.GuildId.Equals(guildId) && r.Content.Equals(reminder.Content)).ToList();
 
             if (savedReminder is not null)

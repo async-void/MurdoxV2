@@ -10,7 +10,7 @@ namespace MurdoxV2.SlashCommands.Member.Reminders
 {
     [Command("reminder")]
     [Description("Manage member reminders.")]
-    public class ReminderCommand(IReminderData reminderData, IReminder reminderService)
+    public class ReminderCommand(IReminderData reminderData, IReminder reminderService, IMemberData memberService)
     {
         #region REMIND
         [Command("remind")]
@@ -25,6 +25,50 @@ namespace MurdoxV2.SlashCommands.Member.Reminders
             var unixTimestamp = timestamp.ToUnixTimeSeconds();
             var discordTimestamp = $"<t:{unixTimestamp}:R>";
 
+            var memberResult = await memberService.GetMemberAsync(ctx.Guild!.Id.ToString(), ctx.User.Id.ToString());
+            
+            if (memberResult.IsOk)
+            {
+                
+                var _reminder = new Reminder
+                {
+                    ServerMemberId = memberResult.Value.Id,
+                    DiscordId = memberResult.Value.DiscordId,
+                    Content = message,
+                    GuildId = ctx.Guild.Id.ToString(),
+                    ChannelId = ctx.Channel.Id.ToString(),
+                    CreatedAt = DateTimeOffset.UtcNow.ToUniversalTime(),
+                    CompleteAt = DateTimeOffset.UtcNow.ToUniversalTime().AddMilliseconds((long)duration.Value),  
+                    Duration = TimeSpan.FromMilliseconds((long)duration.Value),
+                };
+                var _reminderResult = await reminderService.SaveReminderAsync(_reminder);
+                if (_reminderResult.IsOk)
+                {
+                    DiscordComponent[] components =
+                    [
+                        new DiscordTextDisplayComponent($"**Reminder** {message} set!"),
+                        new DiscordSeparatorComponent(true),
+                        new DiscordTextDisplayComponent($"I will remind you {discordTimestamp}"),
+                        new DiscordSeparatorComponent(true, DiscordSeparatorSpacing.Large),
+                        new DiscordSectionComponent(new DiscordTextDisplayComponent($"Murdox ©️ {DateTime.UtcNow.Year}"),
+                            new DiscordButtonComponent(DiscordButtonStyle.Primary, "donateBtn", "Donate"))
+                    ];
+
+                    var container = new DiscordContainerComponent(components, false, DiscordColor.Teal);
+                    var msg = new DiscordMessageBuilder()
+                        .EnableV2Components()
+                        .AddContainerComponent(container);
+                    await ctx.RespondAsync(msg);
+                    return;
+                }
+                else
+                {
+                    await ctx.RespondAsync($"Error setting reminder: {_reminderResult.Error.ErrorMessage}");
+                    return;
+                }
+                   
+                
+            }
             var bank = new Bank()
             {
                 Balance = 100,
@@ -40,16 +84,23 @@ namespace MurdoxV2.SlashCommands.Member.Reminders
                 Discriminator = ctx.User.Discriminator,
                 Nickname = ctx.Member?.Nickname ?? ctx.User.Username,
                 AvatarUrl = ctx.User.AvatarUrl ?? ctx.User.DefaultAvatarUrl,
+                JoinedAt = DateTimeOffset.UtcNow.ToUniversalTime(),
+                CreatedAt = DateTimeOffset.UtcNow.ToUniversalTime(),
+                IsBot = ctx.User.IsBot,
+                IsMuted = false,
+                IsBanned = false,
+                MessageCount = 0,
                 Bank = bank,
             };
             var reminder = new Reminder
             {
                 Member = member,
+                DiscordId = ctx.User.Id.ToString(),
                 Content = message,
                 GuildId = ctx.Guild.Id.ToString(),
                 ChannelId = ctx.Channel.Id.ToString(),
-                CreatedAt = DateTime.UtcNow,
-                CompleteAt = DateTime.UtcNow.AddMilliseconds((long)duration.Value),
+                CreatedAt = DateTimeOffset.UtcNow.ToUniversalTime(),
+                CompleteAt = DateTimeOffset.UtcNow.AddMilliseconds((long)duration.Value),
                 Duration = TimeSpan.FromMilliseconds((long)duration.Value),
             };
             var reminderResult = await reminderService.SaveReminderAsync(reminder);
@@ -97,7 +148,7 @@ namespace MurdoxV2.SlashCommands.Member.Reminders
                 await ctx.RespondAsync("You have no reminders set.");
                 return;
             }
-            var response = new DiscordMessageBuilder()
+            var response = new DiscordMessageBuilder()//TODO: conver to V2 container with paging
                 .WithContent("Your reminders:\n" + string.Join("\n", reminders.Select(r => $"{r.Id}: {r.Content} (Due: {r.CompleteAt})")));
             await ctx.RespondAsync(response);
         } 

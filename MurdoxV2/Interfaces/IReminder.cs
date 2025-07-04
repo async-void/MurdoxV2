@@ -11,6 +11,7 @@ namespace MurdoxV2.Interfaces
     public interface IReminder
     {
         Task<Result<bool, SystemError<ReminderService>>> SaveReminderAsync(Reminder reminder);
-        Task<Result<List<Reminder>, SystemError<ReminderService>>> GetAllRemindersForGuildAsync(string guildId);
+        Task<Result<List<Reminder>, SystemError<ReminderService>>> GetAllRemindersAsync();
+        Task<Result<bool, SystemError<ReminderService>>> UpdateMemberReminderAsync(Reminder reminder);
     }
 }

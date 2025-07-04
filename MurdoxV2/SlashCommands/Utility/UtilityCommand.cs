@@ -1,9 +1,15 @@
 ﻿using DSharpPlus.Commands;
 using DSharpPlus.Entities;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using MurdoxV2.Data.DbContext;
 using MurdoxV2.Factories;
+using MurdoxV2.Interfaces;
+using MurdoxV2.Models;
+using MurdoxV2.Schedules;
+using MurdoxV2.Services;
 using MurdoxV2.Utilities.Timestamp;
+using Quartz;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
@@ -16,8 +22,10 @@ namespace MurdoxV2.SlashCommands.Utility
 {
     [Command("utility")]
     [Description("Utility commands for various functionalities")]
-    public class UtilityCommands(IDbContextFactory<AppDbContext> dbFactory)
+    public class UtilityCommands(IDbContextFactory<AppDbContext> dbFactory, IFact factService)
     {
+        private readonly IDbContextFactory<AppDbContext> _dbFactory = dbFactory;
+        private readonly IFact _factService = factService;
 
         #region UPTIME
         [Command("uptime")]
@@ -58,7 +66,8 @@ namespace MurdoxV2.SlashCommands.Utility
             var discordPing = ctx.Client.GetConnectionLatency(guildId);
 
             sw.Start();
-            var dbLatency = dbFactory.CreateDbContext();
+            using var db = _dbFactory.CreateDbContext();
+            var dbLatency = await db.Reminders.FirstOrDefaultAsync();
             sw.Stop();
             var dbPing = sw.ElapsedMilliseconds;
 
@@ -93,7 +102,39 @@ namespace MurdoxV2.SlashCommands.Utility
                 .AddContainerComponent(container);
 
             await ctx.EditResponseAsync(msg);
-        } 
+        }
+        #endregion
+
+        #region ENABLE DAILY RANDOM FACTS
+        [Command("enable-facts")]
+        [Description("Enable daily random facts in the server")]
+        public async Task EnableFacts(CommandContext ctx)
+        {
+            await ctx.DeferResponseAsync();
+            var provider = ctx.Client.ServiceProvider;
+            var scheduler = provider.GetRequiredService<IScheduler>();
+
+            using var db = _dbFactory.CreateDbContext();
+            var guild = await db.Guilds
+                .AsNoTracking()
+                .FirstOrDefaultAsync(g => g.GuildId == ctx.Guild!.Id.ToString());
+            if (guild is null)
+            {
+                var g = new Server()
+                {
+                    GuildId = ctx.Guild!.Id.ToString(),
+                    GuildName = ctx.Guild.Name,
+                    EnableFacts = true,
+                    NotificationChannelId = ctx.Guild.GetDefaultChannel()!.Id.ToString(),
+                    OwnerId = ctx.Guild.OwnerId.ToString(),
+                    OwnerUsername = ctx.Guild.GetMemberAsync(ctx.Guild.OwnerId).Result.GlobalName!,
+                    CreatedAt = DateTimeOffset.UtcNow,
+                };
+                await db.Guilds.AddAsync(g);
+                await db.SaveChangesAsync();
+            }
+            await ctx.RespondAsync("facts are enabled!");
+        }
         #endregion
     }
 }

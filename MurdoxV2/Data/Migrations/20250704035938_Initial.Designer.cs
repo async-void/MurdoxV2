@@ -12,7 +12,7 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace MurdoxV2.Data.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    [Migration("20250626183946_Initial")]
+    [Migration("20250704035938_Initial")]
     partial class Initial
     {
         /// <inheritdoc />
@@ -39,18 +39,42 @@ namespace MurdoxV2.Data.Migrations
                     b.Property<double>("Deposit_Amount")
                         .HasColumnType("double precision");
 
-                    b.Property<DateTime>("Deposit_Timestamp")
+                    b.Property<DateTimeOffset>("Deposit_Timestamp")
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<double>("Withdraw_Amount")
                         .HasColumnType("double precision");
 
-                    b.Property<DateTime>("Withdraw_Timestamp")
+                    b.Property<DateTimeOffset>("Withdraw_Timestamp")
                         .HasColumnType("timestamp with time zone");
 
                     b.HasKey("Id");
 
                     b.ToTable("Bank");
+                });
+
+            modelBuilder.Entity("MurdoxV2.Models.Fact", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Category")
+                        .HasColumnType("text");
+
+                    b.Property<string>("Content")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("FactUrl")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("Facts");
                 });
 
             modelBuilder.Entity("MurdoxV2.Models.Reminder", b =>
@@ -65,15 +89,19 @@ namespace MurdoxV2.Data.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
-                    b.Property<DateTime>("CompleteAt")
+                    b.Property<DateTimeOffset>("CompleteAt")
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("Content")
                         .IsRequired()
                         .HasColumnType("text");
 
-                    b.Property<DateTime>("CreatedAt")
+                    b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("DiscordId")
+                        .IsRequired()
+                        .HasColumnType("text");
 
                     b.Property<TimeSpan>("Duration")
                         .HasColumnType("interval");
@@ -82,14 +110,56 @@ namespace MurdoxV2.Data.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
-                    b.Property<int>("MemberId")
+                    b.Property<bool>("IsComplete")
+                        .HasColumnType("boolean");
+
+                    b.Property<int>("ServerMemberId")
                         .HasColumnType("integer");
 
                     b.HasKey("Id");
 
-                    b.HasIndex("MemberId");
+                    b.HasIndex("ServerMemberId");
 
                     b.ToTable("Reminders");
+                });
+
+            modelBuilder.Entity("MurdoxV2.Models.Server", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("EnableFacts")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("GuildId")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("GuildName")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("NotificationChannelId")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("OwnerId")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("OwnerUsername")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("Guilds");
                 });
 
             modelBuilder.Entity("MurdoxV2.Models.ServerMember", b =>
@@ -145,6 +215,9 @@ namespace MurdoxV2.Data.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
+                    b.Property<int?>("ServerId")
+                        .HasColumnType("integer");
+
                     b.Property<string>("UserStatus")
                         .HasColumnType("text");
 
@@ -155,6 +228,8 @@ namespace MurdoxV2.Data.Migrations
 
                     b.HasIndex("BankId");
 
+                    b.HasIndex("ServerId");
+
                     b.ToTable("Members");
                 });
 
@@ -162,7 +237,7 @@ namespace MurdoxV2.Data.Migrations
                 {
                     b.HasOne("MurdoxV2.Models.ServerMember", "Member")
                         .WithMany("Reminders")
-                        .HasForeignKey("MemberId")
+                        .HasForeignKey("ServerMemberId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
@@ -177,10 +252,19 @@ namespace MurdoxV2.Data.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
+                    b.HasOne("MurdoxV2.Models.Server", null)
+                        .WithMany("Members")
+                        .HasForeignKey("ServerId");
+
                     b.Navigation("Bank");
                 });
 
             modelBuilder.Entity("MurdoxV2.Models.Bank", b =>
+                {
+                    b.Navigation("Members");
+                });
+
+            modelBuilder.Entity("MurdoxV2.Models.Server", b =>
                 {
                     b.Navigation("Members");
                 });

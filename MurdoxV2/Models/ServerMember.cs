@@ -26,8 +26,8 @@ namespace MurdoxV2.Models
         public int MessageCount { get; set; }
 
         public int BankId { get; set; } //Foreign Key
-        public Bank? Bank { get; set; } //Navigation Property One Bank to Many ServerMembers
-        public ICollection<Reminder>? Reminders { get; set; }
+        public Bank Bank { get; set; } = new(); //Navigation Property One Bank to Many ServerMembers
+        public ICollection<Reminder>? Reminders { get; set; } = [];
 
     }
 }
