@@ -10,8 +10,8 @@ namespace MurdoxV2.Models
     public class ServerMember
     {
         public int Id { get; set; }
-        public required string DiscordId { get; set; }
-        public required string GuildId { get; set; }
+        public required ulong DiscordId { get; set; }
+        public required ulong GuildId { get; set; }
         public required string GlobalUsername{ get; set; }
         public required string Discriminator { get; set; }
         public required string Nickname { get; set; }
@@ -25,9 +25,10 @@ namespace MurdoxV2.Models
         public bool? IsBanned { get; set; }
         public int MessageCount { get; set; }
 
-        public int BankId { get; set; } //Foreign Key
-        public Bank Bank { get; set; } = new(); //Navigation Property One Bank to Many ServerMembers
+        public int? BankId { get; set; } 
+        public Bank? Bank { get; set; }
         public ICollection<Reminder>? Reminders { get; set; } = [];
+        public ICollection<Ticket>? Tickets { get; set; } = []; 
 
     }
 }

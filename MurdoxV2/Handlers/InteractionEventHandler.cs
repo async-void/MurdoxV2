@@ -1,6 +1,7 @@
 ﻿using DSharpPlus;
 using DSharpPlus.Entities;
 using DSharpPlus.EventArgs;
+using MurdoxV2.Pagination;
 using MurdoxV2.Utilities.Timestamp;
 using System;
 using System.Collections.Generic;
@@ -19,6 +20,7 @@ namespace MurdoxV2.Handlers
             {
                 #region BUTTONS
                 case DiscordInteractionType.Component:
+
                     switch (eventArgs.Interaction.Data.CustomId)
                     {
                         case "purgeBtn":
@@ -55,7 +57,7 @@ namespace MurdoxV2.Handlers
                             await eventArgs.Interaction.CreateResponseAsync(DiscordInteractionResponseType.UpdateMessage, new DiscordInteractionResponseBuilder()
                                 .WithContent("Donate button clicked!"));
                             break;
-
+                       
                         #region UPTIME
                         case "uptimeBtn":
                             // Handle warn button interaction

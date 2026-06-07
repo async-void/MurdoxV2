@@ -1,0 +1,104 @@
+{
+  "memberWelcomeMessages": [
+    {
+      "emoji": "🎉",
+      "message": "Welcome to the server, {username}! We're glad you're here."
+    },
+    {
+      "emoji": "👋",
+      "message": "Hey {username}, great to have you with us. Make yourself at home!"
+    },
+    {
+      "emoji": "🌟",
+      "message": "Welcome aboard, {username}! Hope you enjoy your stay."
+    },
+    {
+      "emoji": "😊",
+      "message": "Hi {username}! Thanks for joining — we're excited to have you."
+    },
+    {
+      "emoji": "🎈",
+      "message": "Glad you're here, {username}! Jump into the conversation anytime."
+    },
+    {
+      "emoji": "✨",
+      "message": "Welcome, {username}! We hope you like it here."
+    },
+    {
+      "emoji": "🤝",
+      "message": "Nice to meet you, {username}! Enjoy the server."
+    },
+    {
+      "emoji": "🏠",
+      "message": "Welcome in, {username}! We're happy you made it."
+    },
+    {
+      "emoji": "🎊",
+      "message": "{username} just joined the party! Welcome!"
+    },
+    {
+      "emoji": "🚀",
+      "message": "{username} has landed — welcome to the server!"
+    },
+    {
+      "emoji": "🔥",
+      "message": "{username} just dropped in — say hi!"
+    },
+    {
+      "emoji": "🌈",
+      "message": "Welcome, {username}! Let’s make things awesome together."
+    },
+    {
+      "emoji": "⚡",
+      "message": "{username} joined the server! Let’s go!"
+    },
+    {
+      "emoji": "💬",
+      "message": "Welcome to the community, {username}. We're glad to have you."
+    },
+    {
+      "emoji": "📌",
+      "message": "Thank you for joining us, {username}."
+    },
+    {
+      "emoji": "🤗",
+      "message": "We appreciate you being here, {username}."
+    },
+    {
+      "emoji": "💡",
+      "message": "Welcome, {username}. Let us know if you need anything."
+    },
+    {
+      "emoji": "📣",
+      "message": "Thanks for joining, {username}. Enjoy your time here."
+    },
+    {
+      "emoji": "🏆",
+      "message": "We're pleased to welcome you, {username}."
+    },
+    {
+      "emoji": "🌐",
+      "message": "Welcome to the server, {username}. We hope you find it valuable."
+    },
+    {
+      "emoji": "🎵",
+      "message": "Glad you’re here, {username}! Feel free to explore."
+    },
+    {
+      "emoji": "🧭",
+      "message": "Welcome, {username}! If you need help finding anything, just ask."
+    },
+    {
+      "emoji": "💫",
+      "message": "Happy to have you with us, {username}!"
+    },
+    {
+      "emoji": "🪄",
+      "message": "Welcome, {username}! We're excited to see you around."
+    },
+    {
+      "emoji": "🌻",
+      "message": "Hi {username}! Thanks for joining — we hope you enjoy your stay."
+    }
+  ]
+}

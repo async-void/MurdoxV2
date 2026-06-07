@@ -15,12 +15,12 @@
 
         public bool IsOk => _success;
 
-        public static Result<T, E> Ok(T v) { return new(v, default(E)!, true); }
+        public static Result<T, E> Ok(T v) { return new(v, default!, true); }
 
-        public static Result<T, E> Err(E e) { return new(default(T)!, e, false); }
+        public static Result<T, E> Err(E e) { return new(default!, e, false); }
 
-        public static implicit operator Result<T, E>(T v) => new(v, default(E)!, true);
-        public static implicit operator Result<T, E>(E e) => new(default(T)!, e, false);
+        public static implicit operator Result<T, E>(T v) => new(v, default!, true);
+        public static implicit operator Result<T, E>(E e) => new(default!, e, false);
 
         public R Match<R>(Func<T, R> success, Func<E, R> failure) =>
             _success ? success(Value) : failure(Error);

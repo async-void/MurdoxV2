@@ -1,5 +1,7 @@
 ﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using MurdoxV2.Data.DbContext;
+using MurdoxV2.Enums;
 using MurdoxV2.Interfaces;
 using MurdoxV2.Models;
 using Serilog;
@@ -11,7 +13,7 @@ using System.Threading.Tasks;
 
 namespace MurdoxV2.Services
 {
-    public class ReminderService(IDbContextFactory<AppDbContext> dbFactory) : IReminder
+    public class ReminderService(IDbContextFactory<AppDbContext> dbFactory, ILogger<ReminderService> logger) : IReminder
     {
         private readonly IDbContextFactory<AppDbContext> _dbFactory = dbFactory;
 
@@ -26,6 +28,7 @@ namespace MurdoxV2.Services
             using var db = _dbFactory.CreateDbContext();
             var member = await db.Members
                 .FirstOrDefaultAsync(m => m.DiscordId == reminder.DiscordId && m.GuildId == reminder.GuildId);
+                
             if (member is null)
             {
                 member = new ServerMember()
@@ -42,26 +45,27 @@ namespace MurdoxV2.Services
                     IsMuted = reminder.Member.IsMuted,
                     IsBanned = reminder.Member.IsBanned,
                     MessageCount = reminder.Member.MessageCount,
-                    Bank = reminder.Member.Bank ?? new Bank()
-                    {
-                        Balance = 100,
-                        Deposit_Amount = 0,
-                        Deposit_Timestamp = DateTime.UtcNow,
-                    }
+                    //Bank = reminder.Member.Bank ?? new Bank()
+                    //{
+                    //    Balance = 100,
+                    //    Deposit_Amount = 0,
+                    //    Deposit_Timestamp = DateTimeOffset.UtcNow,
+                    //    Withdraw_Timestamp = DateTimeOffset.UtcNow
+                    //}
                 };
                 await db.Members.AddAsync(member);
                 await db.SaveChangesAsync();
             }
-            
-            await db.AddAsync(reminder);
+
             try
             {
+                await db.AddAsync(reminder);
                 await db.SaveChangesAsync();
                 return Result<bool, SystemError<ReminderService>>.Ok(true);
             }
             catch (DbUpdateException ex)
             {
-                Log.Error(ex, "Error saving reminder to the database.");
+                logger.LogError(ex, "Error saving reminder to the database.");
                 return Result<bool, SystemError<ReminderService>>.Err(new SystemError<ReminderService>
                 {
                     ErrorMessage = ex.Message,
@@ -72,7 +76,7 @@ namespace MurdoxV2.Services
             }
             catch (Exception ex)
             {
-                Log.Error(ex, "An unexpected error occurred while saving the reminder.");
+                logger.LogError(ex, "An unexpected error occurred while saving the reminder.");
                 return Result<bool, SystemError<ReminderService>>.Err(new SystemError<ReminderService>
                 {
                     ErrorMessage = ex.Message,
@@ -90,6 +94,7 @@ namespace MurdoxV2.Services
         {
             using var db = _dbFactory.CreateDbContext();
             var reminders = await db.Reminders
+                .AsNoTracking()
                 .ToListAsync();
             if (reminders.Count > 0)
                 return Result<List<Reminder>, SystemError<ReminderService>>.Ok(reminders);
@@ -120,7 +125,7 @@ namespace MurdoxV2.Services
             return Result<bool, SystemError<ReminderService>>.Err(new SystemError<ReminderService>
             {
                 ErrorMessage = "Could not update reminder.",
-                ErrorType = Enums.ErrorType.INFORMATION,
+                ErrorType = ErrorType.INFORMATION,
                 CreatedAt = DateTimeOffset.UtcNow,
                 CreatedBy = this,
             });

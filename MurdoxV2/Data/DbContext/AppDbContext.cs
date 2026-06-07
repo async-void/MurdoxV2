@@ -1,4 +1,5 @@
 ﻿using Microsoft.EntityFrameworkCore;
+using MurdoxV2.Features.ScamDetection;
 using MurdoxV2.Models;
 namespace MurdoxV2.Data.DbContext
 {
@@ -8,6 +9,9 @@ namespace MurdoxV2.Data.DbContext
         public DbSet<Reminder> Reminders { get; set; }
         public DbSet<Fact> Facts { get; set; }
         public DbSet<Server> Guilds { get; set; }
+        public DbSet<Tag> Tags { get; set; }
+        public DbSet<Ticket> Tickets { get; set; }
+        public DbSet<ScamImageRecord> ScamImages => Set<ScamImageRecord>();
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -17,6 +21,11 @@ namespace MurdoxV2.Data.DbContext
                 .WithMany(m => m.Reminders)
                 .HasForeignKey(r => r.ServerMemberId)
                 .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<ScamImageRecord>()
+                .HasIndex(x => new { x.AHash, x.DHash, x.PHash })
+                .IsUnique();
+
         }
     }
 }

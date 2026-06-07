@@ -46,7 +46,7 @@ namespace MurdoxV2.Services
             }
 
             var json = await File.ReadAllTextAsync(path);
-            var conStr = JsonSerializer.Deserialize<ConfigJson>(json)?.Token;
+            var conStr = JsonSerializer.Deserialize<ConfigJson>(json)?.Discord.Token;
             return Result<string, SystemError<ConfigurationDataServiceProvider>>.Ok(conStr ?? "not found");
         }
     }

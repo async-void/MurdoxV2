@@ -1,31 +1,31 @@
 ﻿using DSharpPlus.Commands;
 using DSharpPlus.Commands.ContextChecks;
+using DSharpPlus.Commands.Processors.SlashCommands;
 using DSharpPlus.Entities;
+using Humanizer;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using MurdoxV2.Data.DbContext;
+using MurdoxV2.Extensions;
 using MurdoxV2.Interfaces;
 using MurdoxV2.Models;
-using System;
-using System.Collections.Generic;
+using MurdoxV2.RoleCheck;
+using MurdoxV2.Utilities.Timestamp;
 using System.ComponentModel;
-using System.Linq;
-using System.Text;
-using System.Threading.Channels;
-using System.Threading.Tasks;
 
 namespace MurdoxV2.SlashCommands.Moderation
 {
     [Command("moderation")]
     [Description("Moderation commands for managing the server.")]
     [RequirePermissions(DiscordPermission.ManageGuild)]
-    public class ModerationCommands(IMemberData memberService)
+    public class ModerationCommands(IDbContextFactory<AppDbContext> dbFactory, IMemberData memberService, ILogger<ModerationCommands> logger)
     {
         private readonly IMemberData _memberService = memberService;
 
         #region PURGE
         [Command("purge")]
         [Description("remove a set number of messages from the channel (100 max)")]
-        public async Task Purge(CommandContext ctx, [Parameter("amount")] int amount)
+        public static async ValueTask Purge(CommandContext ctx, [Parameter("amount")] int amount)
         {
             var rnd = new Random();
             await foreach (var message in ctx.Channel.GetMessagesAsync(amount))
@@ -35,11 +35,12 @@ namespace MurdoxV2.SlashCommands.Moderation
                 await Task.Delay(delay);
             }
 
+            var amountSuffix = amount == 1 ? "message" : "messages";
             var components = new DiscordComponent[]
             {
                 new DiscordTextDisplayComponent("**Purge**"),
                 new DiscordSeparatorComponent(true),
-                new DiscordTextDisplayComponent($"Done , I removed ``{amount}`` messages from ``{ctx.Channel.Name}``"),
+                new DiscordTextDisplayComponent($"Done , I removed ``{amount}`` {amountSuffix} from ``{ctx.Channel.Name}``"),
                 new DiscordSeparatorComponent(true, DiscordSeparatorSpacing.Large),
                 new DiscordSectionComponent(new DiscordTextDisplayComponent($"-# Murdox ©️ {DateTime.UtcNow:ddd, MM-dd-yyyy hh:mm tt}"),
                                         new DiscordButtonComponent(DiscordButtonStyle.Secondary, "donateBtn", "Donate")),
@@ -61,7 +62,7 @@ namespace MurdoxV2.SlashCommands.Moderation
         public async Task AddXp(CommandContext ctx, [Parameter("user")] DiscordUser user, [Parameter("amount")] int amount)
         {
             await ctx.DeferResponseAsync();
-            var member = await _memberService.GetMemberAsync(ctx.Guild!.Id.ToString(), user.Id.ToString());
+            var member = await _memberService.GetMemberAsync(ctx.Guild!.Id, user.Id);
 
             if (!member.IsOk)
             {
@@ -75,23 +76,332 @@ namespace MurdoxV2.SlashCommands.Moderation
 
                 var mem = new ServerMember
                 {
-                    DiscordId = user.Id.ToString(),
-                    GuildId = ctx.Guild.Id.ToString(),
+                    DiscordId = user.Id,
+                    GuildId = ctx.Guild.Id,
                     XP = amount,
-                    GlobalUsername = user.GlobalName,
-                    Nickname = user.Username,
-                    AvatarUrl = user.AvatarUrl ?? string.Empty,
-                    Discriminator = user.Discriminator,
+                    GlobalUsername = user?.GlobalName ?? "UNKNOWN",
+                    Nickname = user?.Username ?? "UNKNOWN",
+                    AvatarUrl = user?.AvatarUrl ?? string.Empty,
+                    Discriminator = user?.Discriminator ?? string.Empty,
                     Bank = bank,
                 };
 
-                await ctx.RespondAsync($"User {user.Username} now has ``{amount}`` XP");
+                var success = await _memberService.SaveMemberAsync(mem);
+                if (success.IsOk)
+                    await ctx.RespondAsync($"User {mem?.GlobalUsername ?? "UNKNOWN"} now has ``{mem?.Bank.Balance ?? 0}`` XP");
+                else
+                    await ctx.RespondAsync($"there was an error saving member: {mem.GlobalUsername} to the database\r\r{success.Error.ErrorMessage}");
                 return;
             }
             member.Value.XP += amount;
-
+            //TODO: Update member data.
             await ctx.RespondAsync($"Added {amount} XP to {user.Username}. New XP: {member.Value.XP}");
         }
+        #endregion
+
+        #region LOCK CHANNEL
+        [Command("lock-channel")]
+        [Description("deny all send permissions for channel")]
+        public async ValueTask LockChannel(SlashCommandContext ctx, [Parameter("reason")] string reason)
+        {
+            await ctx.DeferResponseAsync();
+            var timestamp = DateTimeOffset.UtcNow.ToTimestamp();
+            var author = ctx.Member.Username;
+            var channel = ctx.Channel;
+            var everyOneRole = ctx.Guild.EveryoneRole;
+            await channel.AddOverwriteAsync(everyOneRole, deny: DiscordPermissions.All);
+
+            DiscordComponent[] comps =
+            [
+                new DiscordTextDisplayComponent("## Channel Locked"),
+                new DiscordSeparatorComponent(true),
+                new DiscordTextDisplayComponent($"{author} locked channel"),
+                new DiscordTextDisplayComponent($"Reason: {reason}"),
+                new DiscordSeparatorComponent(true),
+                new DiscordSectionComponent(new DiscordTextDisplayComponent($"Murdox ©️ {timestamp}"), 
+                    new DiscordButtonComponent(DiscordButtonStyle.Secondary, "donateBtn", "Donate"))
+            ];
+            var container = new DiscordContainerComponent(comps, false, DiscordColor.LightGray);
+            var msg = new DiscordMessageBuilder()
+                .EnableV2Components()
+                .AddContainerComponent(container);
+
+            logger.LogInformation("{mod} locked channel: {channel} in Guild: {guild}", author, channel.Name, ctx.Guild.Name);
+            await ctx.RespondAsync(msg);
+        }
+        #endregion
+
+        #region UNLOCK CHANNEL
+        [Command("unlock-channel")]
+        [Description("allow all send permissions for channel")]
+        public async ValueTask UnLockChannel(SlashCommandContext ctx)
+        {
+            await ctx.DeferResponseAsync();
+            var timestamp = DateTimeOffset.UtcNow.ToTimestamp();
+            var author = ctx.Member.Username;
+            var channel = ctx.Channel;
+            var everyOneRole = ctx.Guild.EveryoneRole;
+            await channel.AddOverwriteAsync(everyOneRole, allow: DiscordPermissions.All);
+
+            DiscordComponent[] comps =
+           [
+               new DiscordTextDisplayComponent("## Channel UnLocked"),
+                new DiscordSeparatorComponent(true),
+                new DiscordTextDisplayComponent($"{author} unlocked channel"),
+                new DiscordSeparatorComponent(true),
+                new DiscordSectionComponent(new DiscordTextDisplayComponent($"Murdox ©️ {timestamp}"),
+                    new DiscordButtonComponent(DiscordButtonStyle.Secondary, "donateBtn", "Donate"))
+           ];
+            var container = new DiscordContainerComponent(comps, false, DiscordColor.LightGray);
+            var msg = new DiscordMessageBuilder()
+                .EnableV2Components()
+                .AddContainerComponent(container);
+
+            logger.LogInformation("{mod} unlocked channel: {channel} in Guild: {guild}", author, channel.Name, ctx.Guild.Name);
+            await ctx.RespondAsync(msg);
+        }
+        #endregion
+
+        #region ENABLE SLOWMODE
+        [Command("enable-slowmode")]
+        [Description("enable slowmode for channel")]
+        public async ValueTask EnableSlowmode(SlashCommandContext ctx, [Parameter("interval")] int interval)
+        {
+            await ctx.DeferResponseAsync();
+            var timestamp = DateTimeOffset.UtcNow.ToTimestamp();
+            var author = ctx.Member.Username;
+            var channel = ctx.Channel;
+
+            await channel.ModifyAsync(c => c.PerUserRateLimit = interval);
+            DiscordComponent[] comps =
+           [
+               new DiscordTextDisplayComponent("## Slowmode Enabled"),
+                new DiscordSeparatorComponent(true),
+                new DiscordTextDisplayComponent($"{author} enabled slowmode with {interval} second interval"),
+                new DiscordSeparatorComponent(true),
+                new DiscordSectionComponent(new DiscordTextDisplayComponent($"Murdox ©️ {timestamp}"),
+                    new DiscordButtonComponent(DiscordButtonStyle.Secondary, "donateBtn", "Donate"))
+           ];
+            var container = new DiscordContainerComponent(comps, false, DiscordColor.LightGray);
+            var msg = new DiscordMessageBuilder()
+                .EnableV2Components()
+                .AddContainerComponent(container);
+            await ctx.RespondAsync(msg);
+        }
+        #endregion
+
+        #region DISABLE SLOWMODE
+        [Command("disable-slowmode")]
+        [Description("disable slowmode for channel")]
+        public async ValueTask DisableSlowmode(SlashCommandContext ctx)
+        {
+            await ctx.DeferResponseAsync();
+            var timestamp = DateTimeOffset.UtcNow.ToTimestamp();
+            var author = ctx.Member.Username;
+            var channel = ctx.Channel;
+
+            await channel.ModifyAsync(c => c.PerUserRateLimit = 0);
+            DiscordComponent[] comps =
+           [
+               new DiscordTextDisplayComponent("## Slowmode Enabled"),
+                new DiscordSeparatorComponent(true),
+                new DiscordTextDisplayComponent($"{author} disabled slowmode"),
+                new DiscordSeparatorComponent(true),
+                new DiscordSectionComponent(new DiscordTextDisplayComponent($"Murdox ©️ {timestamp}"),
+                    new DiscordButtonComponent(DiscordButtonStyle.Secondary, "donateBtn", "Donate"))
+           ];
+            var container = new DiscordContainerComponent(comps, false, DiscordColor.LightGray);
+            var msg = new DiscordMessageBuilder()
+                .EnableV2Components()
+                .AddContainerComponent(container);
+            await ctx.RespondAsync(msg);
+        }
+        #endregion
+
+        #region SET TIMEOUT FOR MEMBER
+        [Command("timeout")]
+        [Description("timeout a member for a specified amount of time")]
+        public async ValueTask SetTimeout(SlashCommandContext ctx, [Parameter("member")] DiscordUser user, [Parameter("duration")] string duration, [Parameter("reason")] string reason)
+        {
+            await ctx.DeferResponseAsync(true);
+            var timestamp = DateTimeOffset.UtcNow.ToTimestamp();
+            if (ctx.Guild is null)
+            {
+                await ctx.RespondAsync("This command can only be used inside a server.");
+                return;
+            }
+
+            var (Success, Value, Unit) = TimestampDataProvider.ValidateTimeout(duration);
+            if (!Success)
+            {
+                await ctx.RespondAsync("input in wrong format"); 
+                return;
+            }
+
+            var member = await ctx.Guild.GetMemberAsync(user.Id);
+            var timeoutUntil = TimestampDataProvider.ParseTimeout(Value, Unit);
+            var timedOutDuration = timeoutUntil.Humanize();
+            await member.TimeoutAsync(timeoutUntil);
+            await Task.Delay(500);
+
+            DiscordComponent[] comps =
+            [
+                new DiscordTextDisplayComponent("## Timed Out"),
+                new DiscordSeparatorComponent(true),
+                new DiscordTextDisplayComponent($"Guild: {ctx.Guild.Name}"),
+                new DiscordTextDisplayComponent($"Channel: {ctx.Channel.Name}"),
+                new DiscordTextDisplayComponent($"Duration: {timedOutDuration}"),
+                new DiscordTextDisplayComponent($"Reason: {reason}"),
+                new DiscordSeparatorComponent(true),
+                new DiscordTextDisplayComponent($"Murdox ©️ {timestamp}")
+                
+            ];
+            var container = new DiscordContainerComponent(comps, false, DiscordColor.DarkRed);
+            var msg = new DiscordMessageBuilder()
+                .EnableV2Components()
+                .AddContainerComponent(container);
+            await member.SendMessageAsync(msg);
+            await ctx.RespondAsync($"{member.DisplayName} has been timed out until {timedOutDuration}");
+        }
+        #endregion
+
+        #region REMOVE TIMEOUT FOR MEMBER
+        [Command("remove-timeout")]
+        [Description("remove timeout for member")]
+        public async ValueTask RemoveSlowmode(SlashCommandContext ctx, [Parameter("member")] DiscordUser user)
+        {
+            await ctx.DeferResponseAsync();
+            var member = await ctx.Guild!.GetMemberAsync(user.Id, false);
+            await member.TimeoutAsync(null);
+        }
+        #endregion
+
+        #region REMOVE MEMBER MESSAGE
+        [Command("remove-message")]
+        [Description("remove a member's message by the message id")]
+        public async ValueTask RemoveMsgById(SlashCommandContext ctx, [Parameter("id")] [Description("the message id")] ulong id,
+            [Parameter("reason")][Description("why the mseeage is being removed")] string reason) 
+        {
+            await ctx.DeferResponseAsync(ephemeral: true);
+            var msgToRemove = await ctx.Channel.GetMessageAsync(id);
+            await msgToRemove.DeleteAsync();
+
+            await Task.Delay(200);
+            await msgToRemove.Author!.SendMessageAsync($"your message in Guild {msgToRemove.Channel!.Guild.Name} Channel: {msgToRemove.Channel.Name} was removed | Reason: {reason}");
+        }
+        #endregion
+
+        #region REMOVE ALL MEMBER MESSAGES
+        [Command("remove-all-user-messages")]
+        [Description("remove all messages from a member in the channel")]
+        public async ValueTask RemoveAllUserMessages(SlashCommandContext ctx, [Parameter("member")] DiscordUser user, [Parameter("reason")] string? reason = null)
+        {
+            await ctx.DeferResponseAsync();
+            var member = await ctx.Guild!.GetMemberAsync(user.Id, false);
+
+            await foreach (var msg in ctx.Channel.GetMessagesAsync())
+            {
+                if (msg.Author!.Id == member.Id)
+                {
+                    await msg.DeleteAsync();
+                    await Task.Delay(200);
+                } 
+            }
+            var finalReason = reason ?? "No reason provided";
+            await user.SendMessageAsync($"all your messages in Guild {ctx.Guild!.Name} Channel: {ctx.Channel.Name} were removed | Reason: {finalReason}");
+        }
+        #endregion
+
+        #region BAN MEMBER WITH REASON
+        [Command("ban")]
+        [Description("ban a member from the server with a reason")]
+        public async ValueTask BanMember(SlashCommandContext ctx, [Parameter("member")] DiscordUser user, [Parameter("reason")] string reason)
+        {
+            await ctx.DeferResponseAsync();
+            var timestamp = DateTimeOffset.UtcNow.ToTimestamp();
+            var member = await ctx.Guild!.GetMemberAsync(user.Id);
+            await member.BanAsync(TimeSpan.FromDays(1), reason);
+            
+            DiscordComponent[] comps =
+            [
+                new DiscordTextDisplayComponent("## Member Banned"),
+                new DiscordSeparatorComponent(true),
+                new DiscordTextDisplayComponent($"Guild: {ctx.Guild.Name}"),
+                new DiscordTextDisplayComponent($"Channel: {ctx.Channel.Name}"),
+                new DiscordTextDisplayComponent($"Reason: {reason}"),
+                new DiscordSeparatorComponent(true),
+                new DiscordTextDisplayComponent("to dispute this ban, please contact the server staff or appeal on the support server"),
+                new DiscordSeparatorComponent(true),
+                new DiscordTextDisplayComponent($"Murdox ©️ {timestamp}")
+                
+            ];
+            var container = new DiscordContainerComponent(comps, false, DiscordColor.DarkRed);
+            var msg = new DiscordMessageBuilder()
+                .EnableV2Components()
+                .AddContainerComponent(container);
+            await member.SendMessageAsync(msg);
+            await ctx.RespondAsync($"{member.DisplayName} has been banned from the server.");
+        }
+        #endregion
+
+        #region UNBAN MEMBER
+        [Command("unban")]
+        [Description("unban a member from the server")]
+        public async ValueTask UnBan(SlashCommandContext ctx, [Parameter("user")] DiscordUser user)
+        {
+            await ctx.DeferResponseAsync();
+            var guild = ctx.Guild!;
+            await guild.UnbanMemberAsync(user.Id);
+
+            DiscordComponent[] comps =
+            [
+                new DiscordTextDisplayComponent("## Member Unbanned"),
+                new DiscordSeparatorComponent(true),
+                new DiscordTextDisplayComponent($"a mod has removed the server ban for {user.Username}"),
+                new DiscordTextDisplayComponent($"Guild: {ctx.Guild?.Name ?? "UnKnown"}"),
+                new DiscordTextDisplayComponent($"Channel: {ctx.Channel?.Name ?? "UnKnown"}"),
+                new DiscordSeparatorComponent(true),
+                new DiscordTextDisplayComponent($"Murdox ©️ {DateTimeOffset.UtcNow.ToTimestamp()}")
+                
+            ];
+            var container = new DiscordContainerComponent(comps, false, DiscordColor.DarkGreen);
+            var msg = new DiscordMessageBuilder()
+                .EnableV2Components()
+                .AddContainerComponent(container);
+            await ctx.RespondAsync($"{ctx.Interaction.Message.Author.Username} has removed a server ban for {user.Mention}");
+            await Task.Delay(500);
+            await user.SendMessageAsync(msg);
+        }
+        #endregion
+
+        #region TOGGLE ALLOW URLS
+
+        [Command("allow-urls")]
+        [Description("toggle allow urls in the server")]
+        public async ValueTask ToggleAllowUrls(SlashCommandContext ctx, [Parameter("toggle")] bool toggle)
+        {
+            await ctx.DeferResponseAsync();
+            var timestamp = DateTimeOffset.UtcNow.ToTimestamp();
+            using var db = await dbFactory.CreateDbContextAsync();
+            var allow = db.Guilds.Where(g => g.GuildId == ctx.Guild!.Id).Select(g => g.AllowUrls).FirstOrDefault();
+            var status = toggle ? "enabled" : "disabled";
+            DiscordComponent[] comps =
+           [
+               new DiscordTextDisplayComponent("## URL Settings Updated"),
+                new DiscordSeparatorComponent(true),
+                new DiscordTextDisplayComponent($"a mod has {status} urls in the server"),
+                new DiscordTextDisplayComponent($"Guild: {ctx.Guild.Name}"),
+                new DiscordTextDisplayComponent($"Channel: {ctx.Channel.Name}"),
+                new DiscordSeparatorComponent(true),
+                new DiscordTextDisplayComponent($"Murdox ©️ {timestamp}")
+           ];
+            var container = new DiscordContainerComponent(comps, false, DiscordColor.LightGray);
+            var msg = new DiscordMessageBuilder()
+                .EnableV2Components()
+                .AddContainerComponent(container);
+            await ctx.RespondAsync(msg);
+        }
+
         #endregion
     }
 }

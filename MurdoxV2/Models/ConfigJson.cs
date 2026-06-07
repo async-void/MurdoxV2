@@ -9,12 +9,8 @@ namespace MurdoxV2.Models
 {
     public class ConfigJson
     {
-        [JsonPropertyName("token")]
-        public string? Token { get; set; }
-
-        [JsonPropertyName("prefix")]
-        public string? Prefix { get; set; }
-
+        [JsonPropertyName("Discord")]
+        public DiscordConfig? Discord { get; set; }
         [JsonPropertyName("ConnectionStrings")]
         public ConnectionStrings? ConnectionStrings { get; set; }
     }

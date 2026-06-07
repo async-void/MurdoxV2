@@ -1,17 +1,13 @@
 ﻿using DSharpPlus;
-using DSharpPlus.Entities;
 using Humanizer;
-using Humanizer.Localisation;
-using Microsoft.EntityFrameworkCore;
-using MurdoxV2.Data.DbContext;
+using Microsoft.Extensions.Logging;
 using MurdoxV2.Interfaces;
 using Quartz;
 using Serilog;
-using System.Globalization;
 
 namespace MurdoxV2.Services
 {
-    public class ReminderJob(IReminder reminderService, DiscordClient client) : IJob
+    public class ReminderJob(IReminder reminderService, DiscordClient client, ILogger<ReminderJob> logger) : IJob
     {
         private readonly DiscordClient _client = client;
         private readonly IReminder _reminderService = reminderService;
@@ -19,7 +15,7 @@ namespace MurdoxV2.Services
         {
             try
             {
-                Log.Information($"fetching reminders from database...");
+                logger.LogInformation($"fetching reminders from database...");
                 var reminders = await _reminderService.GetAllRemindersAsync();
                
                 if (reminders.IsOk)
@@ -31,7 +27,7 @@ namespace MurdoxV2.Services
                         var totalTime = reminder.CreatedAt;
                         var duration = totalTime.Humanize();
                         var completed = reminder.IsComplete;
-                        var channelId = ulong.Parse(reminder.ChannelId);
+                        var channelId = reminder.ChannelId;
                         var channel = await _client.GetChannelAsync(channelId);
 
                         if (isDue >= 0)
@@ -53,7 +49,7 @@ namespace MurdoxV2.Services
             }
             catch (Exception ex)
             {
-                Log.Error(ex, $"Error executing reminder - Error: {ex.Message}");
+                logger.LogError("Error executing reminder - Error: {ex}", ex);
             }
             
         }

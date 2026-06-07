@@ -1,0 +1,106 @@
+{
+  "guildWelcomeMessages": [
+    {
+      "emoji": "🎉",
+      "message": "Thanks for adding me to your server! Excited to help out."
+    },
+    {
+      "emoji": "👋",
+      "message": "Hello everyone! Happy to be part of your community."
+    },
+    {
+      "emoji": "🌟",
+      "message": "Glad to join your guild! Looking forward to assisting."
+    },
+    {
+      "emoji": "😊",
+      "message": "Thanks for inviting me in! Let’s make great things happen."
+    },
+    {
+      "emoji": "🚀",
+      "message": "I’ve landed! Ready to help your server thrive."
+    },
+    {
+      "emoji": "🎈",
+      "message": "Happy to be here! Thanks for welcoming me into your server."
+    },
+    {
+      "emoji": "🔥",
+      "message": "I’m online and ready to go — thanks for having me!"
+    },
+    {
+      "emoji": "✨",
+      "message": "Thanks for adding me! Excited to support your community."
+    },
+    {
+      "emoji": "🤝",
+      "message": "Appreciate the invite! Let me know how I can help."
+    },
+    {
+      "emoji": "💬",
+      "message": "I’m here and ready! Thanks for bringing me into your server."
+    },
+
+    {
+      "emoji": "🎊",
+      "message": "A new guild! Thanks for choosing to add me."
+    },
+    {
+      "emoji": "🌈",
+      "message": "Happy to join your server — looking forward to working with you."
+    },
+    {
+      "emoji": "🟢",
+      "message": "Connection established! Thanks for adding me."
+    },
+    {
+      "emoji": "📢",
+      "message": "Your server has a new bot onboard — thanks for the invite!"
+    },
+    {
+      "emoji": "🏡",
+      "message": "Feels great to be here! Thanks for welcoming me in."
+    },
+    {
+      "emoji": "💡",
+      "message": "Thanks for adding me! Ready to bring some helpful features your way."
+    },
+    {
+      "emoji": "🎵",
+      "message": "Happy to be part of your community — let’s make this fun."
+    },
+    {
+      "emoji": "🛡️",
+      "message": "Guild joined successfully! I’m here to assist however I can."
+    },
+    {
+      "emoji": "🌍",
+      "message": "Thanks for inviting me into your server — glad to be here."
+    },
+    {
+      "emoji": "📘",
+      "message": "I’m now active in your guild. Looking forward to helping out."
+    },
+
+    {
+      "emoji": "⚡",
+      "message": "Powering up in your server — thanks for adding me!"
+    },
+    {
+      "emoji": "🎁",
+      "message": "Thanks for choosing me! I’m excited to support your community."
+    },
+    {
+      "emoji": "🌻",
+      "message": "Happy to join your server — thanks for having me."
+    },
+    {
+      "emoji": "🧭",
+      "message": "New guild discovered! Ready to assist."
+    },
+    {
+      "emoji": "🏆",
+      "message": "Thanks for adding me — I’m here to help make things run smoothly."
+    }
+  ]
+}

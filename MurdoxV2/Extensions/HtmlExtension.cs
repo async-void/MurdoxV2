@@ -8,17 +8,22 @@ using System.Threading.Tasks;
 
 namespace MurdoxV2.Extensions
 {
-    public static class HtmlExtension
+    public static partial class HtmlExtension
     {
         public static string Sanitize(this string input)
         {
             if (string.IsNullOrEmpty(input))
                 return string.Empty;
 
-            string noTags = Regex.Replace(input, "<.*?>", string.Empty);
+            string noTags = HtmlTagRegex().Replace(input, string.Empty);
             string decoded = WebUtility.HtmlDecode(noTags);
 
-            return Regex.Replace(decoded, @"\s{2,}", " ").Trim();
+            return MultiWhitespaceRegex().Replace(decoded, " ").Trim();
         }
+
+        [GeneratedRegex(@"\s{2,}")]
+        private static partial Regex MultiWhitespaceRegex();
+        [GeneratedRegex("<.*?>")]
+        private static partial Regex HtmlTagRegex();
     }
 }

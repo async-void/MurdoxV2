@@ -1,14 +1,9 @@
 ﻿using Humanizer;
-using Humanizer.Localisation;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+using System.Text.RegularExpressions;
 
 namespace MurdoxV2.Utilities.Timestamp
 {
-    public class TimestampDataProvider
+    public partial class TimestampDataProvider
     {
         public static void SetBotTimestamp()
         {
@@ -35,5 +30,42 @@ namespace MurdoxV2.Utilities.Timestamp
                 return "Invalid uptime data format.";
             }
         }
+
+        #region PARSE TIMEOUT DURATION
+        public static DateTimeOffset ParseTimeout(int value, char unit)
+        {
+            TimeSpan timeout = unit switch
+            {
+                's' => TimeSpan.FromSeconds(value),
+                'm' => TimeSpan.FromMinutes(value),
+                'h' => TimeSpan.FromHours(value),
+                'd' => TimeSpan.FromDays(value),
+                'w' => TimeSpan.FromDays(value * 7),
+                _ => throw new ArgumentException($"Unknown duration unit '{unit}'")
+            };
+
+            return DateTimeOffset.UtcNow.Add(timeout);
+        }
+
+        #endregion
+
+        #region TRY VALIDATE TIMEOUT
+        public static (bool Success, int Value, char Unit) ValidateTimeout(string input)
+        {
+            var match = Timeout().Match(input);
+
+            if (!match.Success)
+                return (false, 0, '\0');
+
+            int value = int.Parse(match.Groups["value"].Value);
+            char unit = char.ToLowerInvariant(match.Groups["unit"].Value[0]);
+
+            return (true, value, unit);
+        }
+
+
+        [GeneratedRegex(@"^(?<value>\d+)(?<unit>[smhdw])$", RegexOptions.IgnoreCase | RegexOptions.Compiled, "en-US")]
+        private static partial Regex Timeout();
+        #endregion
     }
 }

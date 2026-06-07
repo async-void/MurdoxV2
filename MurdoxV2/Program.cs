@@ -5,21 +5,39 @@ using DSharpPlus.Commands.Processors.SlashCommands;
 using DSharpPlus.Commands.Processors.TextCommands;
 using DSharpPlus.Extensions;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
-using Microsoft.Extensions.Logging;
+using MurdoxV2.Cache.TicketCache;
+using MurdoxV2.Coordinators;
 using MurdoxV2.Data.DbContext;
+using MurdoxV2.Enrichers;
 using MurdoxV2.Factories;
+using MurdoxV2.Features.ScamDetection;
 using MurdoxV2.Handlers;
+using MurdoxV2.Helpers;
 using MurdoxV2.Interfaces;
+using MurdoxV2.MessageQueue.SystemNotification;
 using MurdoxV2.Models;
+using MurdoxV2.QuartzJobs;
+using MurdoxV2.RoleCheck;
 using MurdoxV2.Services;
+using MurdoxV2.Services.Builders;
+using MurdoxV2.Services.MessageCache;
+using MurdoxV2.Services.Tags;
+using MurdoxV2.Services.Tickets;
+using MurdoxV2.Services.UrlServices;
+using MurdoxV2.Services.Welcomer;
+using MurdoxV2.Services.Welcomer.Guild;
+using MurdoxV2.Services.Welcomer.Member;
+using MurdoxV2.SlashCommands.Moderation;
 using MurdoxV2.Utilities.OnAppClosing;
 using MurdoxV2.Utilities.Timestamp;
 using Quartz;
 using Serilog;
 using Serilog.Sinks.SystemConsole.Themes;
 using System.Reflection;
+using System.Text.Json;
 #endregion
 
 namespace MurdoxV2
@@ -28,7 +46,7 @@ namespace MurdoxV2
     {
         private static readonly Dictionary<ServerMember, int> _userRank = [];
        
-        static async Task Main(string[] args)
+        static async Task Main(string[] eventArgs)
         {
             var configService = new ConfigurationDataServiceProvider();
             var token = await configService.GetDiscordTokenAsync();
@@ -42,13 +60,19 @@ namespace MurdoxV2
             }
 
             var intents = TextCommandProcessor.RequiredIntents | SlashCommandProcessor.RequiredIntents | DiscordIntents.All;
+            var configuration = new ConfigurationBuilder()
+                .SetBasePath(Directory.GetCurrentDirectory())
+                .AddJsonFile(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Data", "Config", "config.json"), optional: false, reloadOnChange: true)
+                .Build();
 
-            var logger = Log.Logger = new LoggerConfiguration()
-                .MinimumLevel.Debug()
-                .MinimumLevel.Override("System.Net.Http", Serilog.Events.LogEventLevel.Error)
-                .WriteTo.Console(theme: AnsiConsoleTheme.Code, outputTemplate: "[{Timestamp:MM-dd-yyyy hh:mm:ss.fff tt zzz} {SourceContext} {Level:u3}] {Message:lj}{NewLine}")
-                .WriteTo.File(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Data", "TextFiles", "Logs", "bot_logs.txt"), rollingInterval: RollingInterval.Day,
-                 outputTemplate: "[{Timestamp:MM-dd-yyyy hh:mm:ss.fff tt zzz} {SourceContext} {Level:u3}] {Message:lj}{NewLine}")
+            Log.Logger = new LoggerConfiguration()
+                .Enrich.With(new ColoredSourceContextEnricher())
+                .Enrich.With(new FourLetterLevelEnricher())
+                .Enrich.With(new RenderedMessageEnricher())
+                .ReadFrom.Configuration(configuration)
+                .WriteTo.Console(
+                    theme: AnsiConsoleTheme.Code,
+                    outputTemplate: "[{Timestamp:M-d-yyyy h:mm:ss.fff tt}] [{ColoredSourceContextPadded}] {ColoredLevel} {ColoredMessage}{NewLine}{Exception}")
                 .CreateLogger();
 
             await Host.CreateDefaultBuilder()
@@ -58,36 +82,93 @@ namespace MurdoxV2
             #region CONFIGURE SERVICES
                 .ConfigureServices((context, services) =>
                 {
-                    services.AddLogging(logging => logging.ClearProviders().AddSerilog(logger));
-
+                    services.Configure<ConfigJson>(configuration.GetSection("Discord"));
                     services.AddHostedService<BotService>()
                         .AddDiscordClient(token.Value, intents)
                         .AddCommandsExtension((options, config) =>
                         {
                             config.AddCommands(Assembly.GetExecutingAssembly());
+                            config.AddCheck<SystemNotificationRoleCheck>();
+                            //config.AddCommands([typeof(ModerationCommands)]);
                         });
 
-                    services.AddSingleton<IDbContextFactory<AppDbContext>>(new AppDbContextFactory(conStr.Value.ConnectionStrings!.Murdox!));
+                    var murdox = conStr.Value?.ConnectionStrings?.Murdox
+                            ?? throw new InvalidOperationException("Missing Murdox connection string.");
+                    services.AddDbContextFactory<AppDbContext>(options =>
+                    {
+                        options.UseNpgsql(murdox);
+                    });
                     services.AddSingleton<IMemberData, MemberDataServiceProvider>();
                     services.AddSingleton<IReminderData, ReminderServiceDataProvider>();
                     services.AddSingleton<IReminder, ReminderService>();
                     services.AddSingleton<IFact, FactDataServiceProvider>();
+                    services.AddSingleton<TicketCache>();
+                    services.AddSingleton<ITicket, TicketDataServiceProvider>();
+                    services.AddSingleton<TicketCoordinator>();
+                    services.AddSingleton<IWelcomer, WelcomerProviderService>();
+                    services.AddSingleton<ITagRepository, TagRepositoryProviderService>();
+                    services.AddSingleton<TagEmbedBuilderProviderService>();
+                    services.AddSingleton<IDiscordEmbedBuilder, EmbedBuilderServiceProvider>();
+                    services.AddSingleton<GuildWelcomeConfig>(provider =>
+                    {
+                        var json = File.ReadAllText(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Services", "Welcomer", "Guild", "guild_welcome_messages.json"));
+                        return JsonSerializer.Deserialize<GuildWelcomeConfig>(json)
+                            ?? throw new InvalidOperationException("Failed to load guild welcome config.");
 
+                    });
+                    services.AddSingleton<GuildWelcomeMessageProvider>();
+
+                    services.AddSingleton<MemberWelcomeConfig>(provider =>
+                    {
+                        var json = File.ReadAllText(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Services", "Welcomer", "Member", "member_welcome_messages.json"));
+                        return JsonSerializer.Deserialize<MemberWelcomeConfig>(json)
+                            ?? throw new InvalidOperationException("Failed to load member welcome config");
+                    });
+                    services.AddSingleton<MemberWelcomeMessageProvider>();
+                    services.AddSingleton<IUrlCaptureService, UrlCaptureServiceProvider>();
+                    services.AddSingleton<IUrlRemovaleService, UrlRemovaleServiceProvider>();
+                    services.AddSingleton<ISystemNotificationQueue, SystemNotificationQueue>();
+                    services.AddHostedService<SystemNotificationDispatcher>();
+                    services.AddSingleton<DiscordMessageCacheService>();
+                    services.AddSingleton<GhostPingService>();
+                    services.AddSingleton(new RateLimitHelper<ulong>(TimeSpan.FromSeconds(1)));
+                    services.AddSingleton<ScamDetectionConfig>();
+                    services.AddSingleton<IScamDetectionService, HeuristicScamDetectionService>();
+                    services.AddSingleton<IImageIngestionService, HttpImageIngestionService>();
+                    services.AddScoped<IScamHashRepository, ScamHashRepository>();
+                    services.AddSingleton(new ScamImageHashConfig(AHashThreshold: 10, DHashThreshold: 10, PHashThreshold: 12));
                     #region QUARTS
                     services.AddQuartz(q =>
                     {
-                        q.ScheduleJob<ReminderJob>(trigger => trigger
-                            .WithIdentity("ReminderJob", "Murdox")
-                            .StartAt(DateTimeOffset.UtcNow.AddSeconds(10))
-                            .WithSimpleSchedule(x => x
-                                .WithInterval(TimeSpan.FromSeconds(10))
-                                .RepeatForever()));
-                        //q.ScheduleJob<DailyFactJob>(trigger => trigger
-                        //    .WithIdentity("DailyFactJob", "Murdox")
-                        //    .StartAt(DateTimeOffset.UtcNow.AddSeconds(10))
-                        //    .WithSimpleSchedule(x => x
-                        //        .WithInterval(TimeSpan.FromSeconds(10))
-                        //        .RepeatForever()));
+                    // Reminder Job
+                    var remindJobKey = new JobKey("ReminderJob");
+                    //TODO: fix this job
+                    q.ScheduleJob<ReminderJob>(trigger => trigger
+                        .WithIdentity("ReminderJob", "Murdox")
+                        .StartAt(DateTimeOffset.UtcNow.AddSeconds(10))
+                        .WithSimpleSchedule(x => x
+                            .WithInterval(TimeSpan.FromMinutes(2))
+                            .RepeatForever()));
+
+                    // Message Cache Reset Job
+                    var cacheResetJobKey = new JobKey("MessageCacheResetJob");
+                    q.AddJob<DiscordMsgCacheResetJob>(opts => opts.WithIdentity(cacheResetJobKey));
+                    q.AddTrigger(opts => opts
+                        .ForJob(cacheResetJobKey)
+                        .WithIdentity("MessageCacheResetJob-trigger")
+                        .WithCronSchedule("0 0 0 * * ?", x => x
+                            .InTimeZone(TimeZoneInfo.FindSystemTimeZoneById("Eastern Standard Time")))
+                    );
+
+                    // Daily Facts Job
+                    var factsJobKey = new JobKey("DailyFactJob");
+                    q.AddJob<DailyFactJob>(opts => opts.WithIdentity(factsJobKey)
+                                                        .WithDescription("Daily Facts Job"));
+                        q.AddTrigger(opts => opts
+                            .ForJob(factsJobKey)
+                            .WithIdentity("DailyFactsJob-trigger")
+                            .WithCronSchedule("0 0 0 * * ?", x => x
+                                .InTimeZone(TimeZoneInfo.FindSystemTimeZoneById("Eastern Standard Time"))));
                     });
 
                     services.AddQuartzHostedService(q => q.WaitForJobsToComplete = true);
@@ -96,26 +177,17 @@ namespace MurdoxV2
 
                     #region EVENT HANDLERS
                     services.ConfigureEventHandlers(
+                        e => e.AddEventHandlers<MessageCreatedEventHandler>(ServiceLifetime.Singleton)
+                              .AddEventHandlers<MemberCreatedEventHandler>(ServiceLifetime.Singleton)
+                              .AddEventHandlers<GuildAddedEventHandler>(ServiceLifetime.Singleton)
+                              .AddEventHandlers<GuildRemovedEventHandler>(ServiceLifetime.Singleton)
+                              .AddEventHandlers<SessionCreatedEventHandler>(ServiceLifetime.Singleton)
+                              .AddEventHandlers<SessionResumedEventHandler>(ServiceLifetime.Singleton)
+                              .AddEventHandlers<ComponentInteractionHandler>(ServiceLifetime.Singleton)
+                              .AddEventHandlers<MessageDeletedEventHandler>(ServiceLifetime.Singleton)
+                              //.AddEventHandlers<InteractionEventHandler>(ServiceLifetime.Singleton)
 
-                    #region SESSION CREATED
-                    e => e.HandleSessionCreated((client, args) =>
-                    {
-                        Log.Information($"Discord Session Created...");
-                        return Task.CompletedTask;
-                    })
-                    #endregion
-
-                    .AddEventHandlers<InteractionEventHandler>(ServiceLifetime.Singleton)
-
-                    #region MESSAGE CREATED
-                    .HandleMessageCreated(async (client, args) =>
-                    {
-                        if (args.Author.IsBot) return;
-                           
-                    })
-                    #endregion
-
-                    #region SOCKETS
+                        #region SOCKETS
                     .HandleSocketClosed((s, e) =>
                     {
                         Log.Information($"Socket closed with code: {e.CloseCode} reason: {e.CloseMessage}");
@@ -128,84 +200,27 @@ namespace MurdoxV2
                     })
                     #endregion
 
-                    #region GUILD ADDED
-                    .HandleGuildCreated(async (client, args) =>//TODO: this may need to be async
-                    {
-                        var db = new AppDbContextFactory(conStr.Value.ConnectionStrings.Murdox!).CreateDbContext();
-                        var guild = await db.Guilds
-                            .AsNoTracking()
-                            .Where(g => g.GuildId.ToString() == args.Guild.Id.ToString())
-                            .FirstOrDefaultAsync();
-                        if (guild is not null) { }
-                        else
-                        {
-                            var _guild = new Server()
-                            {
-                                GuildId = args.Guild.Id.ToString(),
-                                GuildName = args.Guild.Name,
-                                OwnerId = args.Guild.OwnerId.ToString(),
-                                OwnerUsername = args.Guild.GetMemberAsync(args.Guild.OwnerId).ToString() ?? "Unknown",
-                                NotificationChannelId = args.Guild.GetDefaultChannel()!.Id.ToString(),
-                                CreatedAt = DateTimeOffset.UtcNow,
-                                EnableFacts = false,
-                                Members = [.. args.Guild.Members.Select(m => new ServerMember
-                                {
-                                    DiscordId = m.Value.Id.ToString(),
-                                    GuildId = args.Guild.Id.ToString(),
-                                    GlobalUsername = m.Value.Username,
-                                    Nickname = m.Value.Nickname ?? "No Nickname",
-                                    AvatarUrl = m.Value.AvatarUrl,
-                                    Discriminator = m.Value.Discriminator,
-                                    IsBot = m.Value.IsBot,
-                                    JoinedAt = m.Value.JoinedAt,
-                                    UserStatus = m.Value.Presence?.Status.ToString(),
-                                    XP = 0,
-                                    MessageCount = 0,
-                                    Bank = new Bank()
-                                    {
-                                        Balance = 0,
-                                        Deposit_Amount = 0,
-                                        Withdraw_Amount = 0,
-                                        Deposit_Timestamp = DateTimeOffset.UtcNow,
-                                        Withdraw_Timestamp = DateTimeOffset.UtcNow,
-                                    }
-                                })]
-                            };
-                            await db.Guilds.AddAsync(_guild);
-                            await db.SaveChangesAsync();
-
-                        }
-                            Log.Information($"Guild added: {args.Guild.Name} ({args.Guild.Id})");
-                    })
-                    #endregion
-
-                    #region GUILD DELETED
-                    .HandleGuildDeleted((client, args) =>
-                    {
-                        var timestamp = DateTime.UtcNow.ToString("yyyy-MM-dd hh:mm:ss.fff tt zzz");
-                        var db = new AppDbContextFactory(conStr.Value.ConnectionStrings.Murdox!).CreateDbContext();
-                        Log.Information($"Guild Removed: {args.Guild.Name} ({args.Guild.Id})");
-                        return Task.CompletedTask;
-                    })
-                    #endregion
-
                     #region ZOMBIED
-                    .HandleZombied((client, args) =>
+                    .HandleZombied((client, eventArgs) =>
                     {
                         Log.Information($"Discord Zombied...");
                         return Task.CompletedTask;
                     })
                     #endregion
-                );
-                #endregion
+   
+                    );
+                    #endregion
                 })
                 .RunConsoleAsync();
             
-            var cleanuo = new CleanUp(new AppDbContextFactory(conStr.Value.ConnectionStrings!.Murdox!));
-            await cleanuo.SaveMemberDataOnCloseAsync(_userRank);
+            var cleanup = new CleanUp(new AppDbContextFactory(conStr.Value.ConnectionStrings!.Murdox!));
+            await cleanup.SaveMemberDataOnCloseAsync(_userRank);
             await Log.CloseAndFlushAsync();
 
             #endregion
+
+            //var urlRegex = new Regex(@"\b(?:[a-z][a-z0-9+\-.]*://|www\.)[^\s<>()]+",
+            //  RegexOptions.Compiled | RegexOptions.IgnoreCase);
         }
     }
 }

@@ -1,8 +1,12 @@
 ﻿using DSharpPlus.Commands;
+using DSharpPlus.Commands.ContextChecks;
+using DSharpPlus.Commands.Processors.SlashCommands;
 using DSharpPlus.Entities;
+using Humanizer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using MurdoxV2.Data.DbContext;
+using MurdoxV2.Extensions;
 using MurdoxV2.Factories;
 using MurdoxV2.Interfaces;
 using MurdoxV2.Models;
@@ -108,6 +112,7 @@ namespace MurdoxV2.SlashCommands.Utility
         #region ENABLE DAILY RANDOM FACTS
         [Command("enable-facts")]
         [Description("Enable daily random facts in the server")]
+        [RequirePermissions(DiscordPermission.ManageChannels)]
         public async Task EnableFacts(CommandContext ctx)
         {
             await ctx.DeferResponseAsync();
@@ -117,16 +122,16 @@ namespace MurdoxV2.SlashCommands.Utility
             using var db = _dbFactory.CreateDbContext();
             var guild = await db.Guilds
                 .AsNoTracking()
-                .FirstOrDefaultAsync(g => g.GuildId == ctx.Guild!.Id.ToString());
+                .FirstOrDefaultAsync(g => g.GuildId == ctx.Guild!.Id);
             if (guild is null)
             {
                 var g = new Server()
                 {
-                    GuildId = ctx.Guild!.Id.ToString(),
+                    GuildId = ctx.Guild!.Id,
                     GuildName = ctx.Guild.Name,
                     EnableFacts = true,
-                    NotificationChannelId = ctx.Guild.GetDefaultChannel()!.Id.ToString(),
-                    OwnerId = ctx.Guild.OwnerId.ToString(),
+                    NotificationChannelId = ctx.Guild.GetDefaultChannel()!.Id,
+                    OwnerId = ctx.Guild.OwnerId,
                     OwnerUsername = ctx.Guild.GetMemberAsync(ctx.Guild.OwnerId).Result.GlobalName!,
                     CreatedAt = DateTimeOffset.UtcNow,
                 };
@@ -135,6 +140,72 @@ namespace MurdoxV2.SlashCommands.Utility
             }
             await ctx.RespondAsync("facts are enabled!");
         }
+        #endregion
+
+        #region DISABLE FACTS
+        [Command("disable-facts")]
+        [Description("Disable daily random facts in the server")]
+        [RequirePermissions(DiscordPermission.ManageChannels)]
+        public async ValueTask DisableFacts(SlashCommandContext ctx)
+        {
+
+        }
+        #endregion
+
+        #region ABOUT
+        [Command("about")]
+        [Description("Murdox about section")]
+        public async ValueTask MurdoxHelp(SlashCommandContext ctx)
+        {
+            await ctx.DeferResponseAsync();
+            var timestamp = DateTimeOffset.UtcNow.ToTimestamp();
+            var uptime = await TimestampDataProvider.GetBotUptimeAsync();
+            var guildCount = ctx.Client.Guilds.Count();
+            var memoryUsage = 0L;
+            using (var proc = Process.GetCurrentProcess())
+            {
+                memoryUsage = proc.PrivateMemorySize64;
+            }
+            var rows = new List<(string Label, string Value)>
+            {
+                ("Uptime", uptime.Humanize()),
+                ("Memory", $"{memoryUsage / (1024 * 1024)} MB"),
+                ("Guilds", guildCount.ToString())
+            };
+
+            // longest label length
+            int maxLabel = rows.Max(r => r.Label.Length);
+
+            var sb = new StringBuilder();
+            sb.AppendLine("```");
+
+            foreach (var row in rows)
+            {
+                string label = row.Label.PadRight(maxLabel);
+                sb.AppendLine($"{label} : {row.Value}");
+            }
+
+            sb.AppendLine("```");
+
+            string alignedText = sb.ToString();
+
+            DiscordComponent[] comps =
+            [
+                new DiscordTextDisplayComponent("## About ℹ️\r\n-# Murdox is a full service Moderation Discord Bot"),
+                new DiscordSeparatorComponent(true),
+                new DiscordTextDisplayComponent(sb.ToString()),
+                new DiscordSeparatorComponent(true),
+                new DiscordSectionComponent(new DiscordTextDisplayComponent($"Murdox ©️ {timestamp}"),
+                    new DiscordButtonComponent(DiscordButtonStyle.Secondary, "donateBtn", "Donate"))
+            ];
+
+            var container = new DiscordContainerComponent(comps, false, DiscordColor.Goldenrod);
+            var msg = new DiscordMessageBuilder()
+                .EnableV2Components()
+                .AddContainerComponent(container);
+            await ctx.RespondAsync(msg);
+        }
+
         #endregion
     }
 }

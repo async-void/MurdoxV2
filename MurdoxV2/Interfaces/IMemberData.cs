@@ -10,7 +10,7 @@ namespace MurdoxV2.Interfaces
 {
     public interface IMemberData
     {
-        Task<Result<ServerMember, SystemError<MemberDataServiceProvider>>> GetMemberAsync(string guildId, string discordId);
+        Task<Result<ServerMember, SystemError<MemberDataServiceProvider>>> GetMemberAsync(ulong guildId, ulong discordId);
         Task<Result<bool, SystemError<MemberDataServiceProvider>>> UpdateMemberAsync(ServerMember mem);
         Task<Result<bool, SystemError<MemberDataServiceProvider>>> SaveMemberAsync(ServerMember mem);
     }
