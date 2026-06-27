@@ -4,6 +4,7 @@ using Humanizer;
 using Microsoft.Extensions.Logging;
 using MurdoxV2.Extensions;
 using MurdoxV2.Interfaces;
+using MurdoxV2.Services.Builders.Profile;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
@@ -15,8 +16,10 @@ using System.Threading.Tasks;
 
 namespace MurdoxV2.SlashCommands.Member.Profile
 {
-    public class WhoisCommand(IMemberData memberService, ILogger<WhoisCommand> logger)
+    public class WhoisCommand(IMemberData memberService, ILogger<WhoisCommand> logger, ProfileImageBuilderService profileBuilder)
     {
+        private readonly ProfileImageBuilderService _profileBuilder = profileBuilder;
+
         #region WHOIS
         [Command("whois")]
         [Description("Displays information about a user.")]
@@ -31,6 +34,18 @@ namespace MurdoxV2.SlashCommands.Member.Profile
                     : await ctx.Guild!.GetMemberAsync(user.Id);
                 // Fetch the member from the database
                 var dbMember = await memberService.GetMemberAsync(ctx.Guild!.Id, user.Id);
+                var memRoles = guildMember.Roles.ToList();
+                var memberDTO = new MemberProfileDTO
+                {
+                    GuildId = guildMember.Guild.Id,
+                    MemberId = guildMember.Id,
+                    CreatedAt = guildMember.CreationTimestamp,
+                    NickName = guildMember.Nickname,
+                    GuildTag = guildMember.PrimaryGuild?.Tag ?? "UNKOWN",
+                    MemberAvatarUrl = guildMember.AvatarUrl,
+                    GlobalUsername = user.Username,
+                    Roles = memRoles,
+                };
 
                 if (dbMember.IsOk)
                 {
@@ -40,47 +55,60 @@ namespace MurdoxV2.SlashCommands.Member.Profile
                     var reminderCount = dbMember.Value.Reminders?.Count ?? 0;
                     var ticketCount = dbMember.Value.Tickets?.Count ?? 0;
                     var memDescription = $"Nickname: {dbMember.Value.Nickname}\t\tBalance: {balance}\rJoined: {joinedAt.Humanize()}\rStatus: {userStatus}\rReminders: {reminderCount}\rTickets: {ticketCount}";
+                    memberDTO.Bank = dbMember.Value.Bank;
+                    memberDTO.Tickets = dbMember.Value.Tickets?.ToList() ?? [];
+                    memberDTO.Reminders = dbMember.Value.Reminders?.ToList() ?? [];
+                    memberDTO.XP = dbMember.Value.XP;
+                    memberDTO.JoinedGuildAt = guildMember.JoinedAt;
 
-                    DiscordComponent[] comps =
-                    [
-                        new DiscordTextDisplayComponent($"## Whois"),
-                        new DiscordSectionComponent(new DiscordTextDisplayComponent($"## {dbMember.Value.Nickname}"),
-                        new DiscordThumbnailComponent(dbMember.Value.AvatarUrl)),
-                        new DiscordSeparatorComponent(true),
-                        new DiscordTextDisplayComponent(memDescription),
-                        new DiscordSeparatorComponent(true, DiscordSeparatorSpacing.Large),
-                        new DiscordSectionComponent(new DiscordTextDisplayComponent($"MURDoX ©️ {timestamp}"),
-                        new DiscordButtonComponent(DiscordButtonStyle.Primary, "donateId", "Donate"))
-                    ];
-                    var container = new DiscordContainerComponent(comps, false, DiscordColor.Grayple);
-                    var msg = new DiscordMessageBuilder()
-                        .EnableV2Components()
-                        .AddContainerComponent(container);
-                    await ctx.RespondAsync(msg);
+                    var profileImage = await _profileBuilder.BuildProfileImageAsync(memberDTO);
+
+                    var builder = new DiscordWebhookBuilder() // or DiscordInteractionResponseBuilder
+                           .EnableV2Components()
+                           .AddFile("profile.png", profileImage);
+
+                    var mediaItem = new DiscordMediaGalleryItem("attachment://profile.png");
+                    var mediaGallery = new DiscordMediaGalleryComponent(mediaItem);
+
+                    var container = new DiscordContainerComponent(
+                        [
+                            new DiscordTextDisplayComponent($"Profile for {guildMember.Mention}!"),
+                            mediaGallery
+                        ],
+                        color: new DiscordColor("#7160e8")
+                    );
+
+                    builder.AddContainerComponent(container);
+                    await ctx.RespondAsync(builder);
                 }
                 else
                 {
-                    var verifiedStatus = (bool?)guildMember?.Verified ?? true ? "Yes" : "No";
+                    var verifiedStatus = guildMember?.Verified ?? true ? "Yes" : "No";
                     var userStatus = guildMember?.Presence?.Status.ToString() ?? "Unknown";
                     var nickName = guildMember?.Nickname ?? guildMember?.DisplayName ?? "Unknown";
                     var joinedAt = guildMember.JoinedAt - DateTimeOffset.UtcNow;
                     var memDescription = $"Nickname: {nickName}\t\tJoined: {joinedAt.Humanize()}\rVerified: {verifiedStatus}\rStatus: {userStatus}";
-                    DiscordComponent[] comps =
-                    [
-                        new DiscordTextDisplayComponent($"## Whois"),
-                        new DiscordSectionComponent(new DiscordTextDisplayComponent($"## {nickName}"),
-                        new DiscordThumbnailComponent(guildMember.AvatarUrl)),
-                        new DiscordSeparatorComponent(true),
-                        new DiscordTextDisplayComponent(memDescription),
-                        new DiscordSeparatorComponent(true, DiscordSeparatorSpacing.Large),
-                        new DiscordSectionComponent(new DiscordTextDisplayComponent($"MURDoX ©️ {timestamp}"),
-                        new DiscordButtonComponent(DiscordButtonStyle.Primary, "donateId", "Donate"))
-                    ];
-                    var container = new DiscordContainerComponent(comps, false, DiscordColor.Grayple);
-                    var msg = new DiscordMessageBuilder()
-                        .EnableV2Components()
-                        .AddContainerComponent(container);
-                    await ctx.RespondAsync(msg);
+                    memberDTO.UserStatus = verifiedStatus;
+                    memberDTO.VerifiedStatus = verifiedStatus;
+                    var profileImage = await _profileBuilder.BuildProfileImageAsync(memberDTO);
+
+                    var builder = new DiscordWebhookBuilder() // or DiscordInteractionResponseBuilder
+                           .EnableV2Components()
+                           .AddFile("profile.png", profileImage);
+
+                    var mediaItem = new DiscordMediaGalleryItem("attachment://profile.png");
+                    var mediaGallery = new DiscordMediaGalleryComponent(mediaItem);
+
+                    var container = new DiscordContainerComponent(
+                        [
+                            new DiscordTextDisplayComponent($"Profile for {guildMember.Mention}!"),
+                            mediaGallery
+                        ],
+                        color: new DiscordColor("#7160e8")
+                    );
+
+                    builder.AddContainerComponent(container);
+                    await ctx.RespondAsync(builder);
                 }
             }
             catch (Exception e)

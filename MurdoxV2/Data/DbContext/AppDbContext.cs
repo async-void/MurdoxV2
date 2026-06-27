@@ -5,13 +5,14 @@ namespace MurdoxV2.Data.DbContext
 {
     public class AppDbContext(DbContextOptions<AppDbContext> options) : Microsoft.EntityFrameworkCore.DbContext(options)
     {
-        public DbSet<ServerMember> Members { get; set; }
-        public DbSet<Reminder> Reminders { get; set; }
-        public DbSet<Fact> Facts { get; set; }
-        public DbSet<Server> Guilds { get; set; }
-        public DbSet<Tag> Tags { get; set; }
-        public DbSet<Ticket> Tickets { get; set; }
+        public DbSet<ServerMember> Members => Set<ServerMember>();
+        public DbSet<Reminder> Reminders => Set<Reminder>();
+        public DbSet<Fact> Facts => Set<Fact>();
+        public DbSet<Server> Guilds => Set<Server>();
+        public DbSet<Tag> Tags => Set<Tag>();
+        public DbSet<Ticket> Tickets => Set<Ticket>();
         public DbSet<ScamImageRecord> ScamImages => Set<ScamImageRecord>();
+        public DbSet<CachedDiscordMessage> CachedMessages => Set<CachedDiscordMessage>();
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {

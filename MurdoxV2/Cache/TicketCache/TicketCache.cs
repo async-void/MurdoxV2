@@ -11,7 +11,7 @@ namespace MurdoxV2.Cache.TicketCache
         private readonly Dictionary<(ulong GuildId, ulong UserId), Ticket> _openByGuildUser = [];
 
         public bool TryGetOpenTicket(ulong guildId, ulong userId, out Ticket ticket)
-            => _openByGuildUser.TryGetValue((guildId, userId), out ticket);
+            => _openByGuildUser.TryGetValue((guildId, userId), out ticket!);
 
         public bool TryAdd(Ticket ticket)
         {

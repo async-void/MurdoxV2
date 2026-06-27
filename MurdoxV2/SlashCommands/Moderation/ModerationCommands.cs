@@ -7,6 +7,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using MurdoxV2.Data.DbContext;
 using MurdoxV2.Extensions;
+using MurdoxV2.Helpers;
 using MurdoxV2.Interfaces;
 using MurdoxV2.Models;
 using MurdoxV2.RoleCheck;
@@ -18,29 +19,67 @@ namespace MurdoxV2.SlashCommands.Moderation
     [Command("moderation")]
     [Description("Moderation commands for managing the server.")]
     [RequirePermissions(DiscordPermission.ManageGuild)]
-    public class ModerationCommands(IDbContextFactory<AppDbContext> dbFactory, IMemberData memberService, ILogger<ModerationCommands> logger)
+    public class ModerationCommands(IDbContextFactory<AppDbContext> dbFactory, IMemberData memberService, ILogger<ModerationCommands> logger,
+        RateLimitHelper<ulong> rateHelper)
     {
         private readonly IMemberData _memberService = memberService;
+        private readonly RateLimitHelper<ulong> _rateHelper = rateHelper;
+        
 
         #region PURGE
         [Command("purge")]
-        [Description("remove a set number of messages from the channel (100 max)")]
-        public static async ValueTask Purge(CommandContext ctx, [Parameter("amount")] int amount)
+        [Description("remove a set number of messages from the channel with rate limit for chunks of 100 messages")]
+        public async ValueTask Purge(SlashCommandContext ctx, [Parameter("amount")] int amount)
         {
-            var rnd = new Random();
-            await foreach (var message in ctx.Channel.GetMessagesAsync(amount))
+            await ctx.DeferResponseAsync();
+            var originalResponse = await ctx.GetResponseAsync();
+
+            var messages = new List<DiscordMessage>();
+            await foreach (var message in ctx.Channel.GetMessagesAsync(amount)) 
             {
-                var delay = rnd.Next(100, 300);
-                await ctx.Channel.DeleteMessageAsync(message);
-                await Task.Delay(delay);
+                if (message.Id == originalResponse.Id)
+                    continue;
+                messages.Add(message);
             }
 
-            var amountSuffix = amount == 1 ? "message" : "messages";
+            var cutoff = DateTimeOffset.UtcNow.AddDays(-14);
+            var recent = messages.Where(m => m.CreationTimestamp > cutoff).ToList();
+            var old = messages.Where(m => m.CreationTimestamp <= cutoff).ToList();
+            var totalMsgs = messages.Count;
+            var deleted = 0;
+
+            var progressMsg = await ctx.EditResponseAsync(new DiscordWebhookBuilder()
+                .WithContent($"Deleting messages... 0/{totalMsgs}"));
+
+            foreach (var chunk in recent.Chunk(100))
+            {
+                //await _rateHelper.WaitForRateLimitAsync(ctx.Channel.Id);
+                await ctx.Channel.DeleteMessagesAsync(chunk);
+
+                deleted+= chunk.Length;
+                await ctx.EditResponseAsync(new DiscordWebhookBuilder()
+                    .WithContent($"Deleting messages... {deleted}/{totalMsgs}"));
+            }
+            foreach(var message in old)
+            {
+                await _rateHelper.WaitForRateLimitAsync(ctx.Channel.Id);
+                await ctx.Channel.DeleteMessageAsync(message);
+
+                deleted++;
+                if (deleted % 5 == 0 || deleted == totalMsgs)
+                {
+                    var remaining = totalMsgs - deleted;
+                    await ctx.EditResponseAsync(new DiscordWebhookBuilder()
+                        .WithContent($"Deleting messages... {deleted}/{totalMsgs}  [reamining {remaining}]"));
+                }
+            }
+
+            var amountSuffix = totalMsgs == 1 ? "message" : "messages";
             var components = new DiscordComponent[]
             {
                 new DiscordTextDisplayComponent("**Purge**"),
                 new DiscordSeparatorComponent(true),
-                new DiscordTextDisplayComponent($"Done , I removed ``{amount}`` {amountSuffix} from ``{ctx.Channel.Name}``"),
+                new DiscordTextDisplayComponent($":right_arrow: Done , I removed ``{totalMsgs}`` {amountSuffix} from ``{ctx.Channel.Name}``"),
                 new DiscordSeparatorComponent(true, DiscordSeparatorSpacing.Large),
                 new DiscordSectionComponent(new DiscordTextDisplayComponent($"-# Murdox ©️ {DateTime.UtcNow:ddd, MM-dd-yyyy hh:mm tt}"),
                                         new DiscordButtonComponent(DiscordButtonStyle.Secondary, "donateBtn", "Donate")),
@@ -48,10 +87,10 @@ namespace MurdoxV2.SlashCommands.Moderation
 
             var container = new DiscordContainerComponent(components, false, DiscordColor.Violet);
 
-            var msg = new DiscordMessageBuilder()
+            var msg = new DiscordWebhookBuilder()
                 .EnableV2Components()
                 .AddContainerComponent(container);
-            await ctx.Channel.SendMessageAsync(msg);
+            await ctx.EditResponseAsync(msg);
 
         }
         #endregion
@@ -88,9 +127,9 @@ namespace MurdoxV2.SlashCommands.Moderation
 
                 var success = await _memberService.SaveMemberAsync(mem);
                 if (success.IsOk)
-                    await ctx.RespondAsync($"User {mem?.GlobalUsername ?? "UNKNOWN"} now has ``{mem?.Bank.Balance ?? 0}`` XP");
+                    await ctx.RespondAsync($":right_arrow: User {mem?.GlobalUsername ?? "UNKNOWN"} now has ``{mem?.Bank.Balance ?? 0}`` XP");
                 else
-                    await ctx.RespondAsync($"there was an error saving member: {mem.GlobalUsername} to the database\r\r{success.Error.ErrorMessage}");
+                    await ctx.RespondAsync($":right_arrow: there was an error saving member: {mem.GlobalUsername} to the database\r\r{success.Error.ErrorMessage}");
                 return;
             }
             member.Value.XP += amount;
@@ -106,9 +145,9 @@ namespace MurdoxV2.SlashCommands.Moderation
         {
             await ctx.DeferResponseAsync();
             var timestamp = DateTimeOffset.UtcNow.ToTimestamp();
-            var author = ctx.Member.Username;
+            var author = ctx.Member?.Username ?? "Unknown";
             var channel = ctx.Channel;
-            var everyOneRole = ctx.Guild.EveryoneRole;
+            var everyOneRole = ctx.Guild!.EveryoneRole;
             await channel.AddOverwriteAsync(everyOneRole, deny: DiscordPermissions.All);
 
             DiscordComponent[] comps =
@@ -126,7 +165,7 @@ namespace MurdoxV2.SlashCommands.Moderation
                 .EnableV2Components()
                 .AddContainerComponent(container);
 
-            logger.LogInformation("{mod} locked channel: {channel} in Guild: {guild}", author, channel.Name, ctx.Guild.Name);
+            logger.LogInformation("{mod} locked channel: {channel} in Guild: {guild}", author, channel.Name, ctx.Guild!.Name);
             await ctx.RespondAsync(msg);
         }
         #endregion
@@ -138,9 +177,9 @@ namespace MurdoxV2.SlashCommands.Moderation
         {
             await ctx.DeferResponseAsync();
             var timestamp = DateTimeOffset.UtcNow.ToTimestamp();
-            var author = ctx.Member.Username;
+            var author = ctx.Member?.Username ?? "Unknown";
             var channel = ctx.Channel;
-            var everyOneRole = ctx.Guild.EveryoneRole;
+            var everyOneRole = ctx.Guild!.EveryoneRole;
             await channel.AddOverwriteAsync(everyOneRole, allow: DiscordPermissions.All);
 
             DiscordComponent[] comps =
@@ -169,7 +208,7 @@ namespace MurdoxV2.SlashCommands.Moderation
         {
             await ctx.DeferResponseAsync();
             var timestamp = DateTimeOffset.UtcNow.ToTimestamp();
-            var author = ctx.Member.Username;
+            var author = ctx.Member?.Username ?? "Unknown";
             var channel = ctx.Channel;
 
             await channel.ModifyAsync(c => c.PerUserRateLimit = interval);
@@ -197,7 +236,7 @@ namespace MurdoxV2.SlashCommands.Moderation
         {
             await ctx.DeferResponseAsync();
             var timestamp = DateTimeOffset.UtcNow.ToTimestamp();
-            var author = ctx.Member.Username;
+            var author = ctx.Member?.Username ?? "Unknown";
             var channel = ctx.Channel;
 
             await channel.ModifyAsync(c => c.PerUserRateLimit = 0);
@@ -312,6 +351,42 @@ namespace MurdoxV2.SlashCommands.Moderation
         }
         #endregion
 
+        #region REMOVE INACTIVE MEMBERS
+
+        [Command("configure")]
+        [Description("configure server settings")]
+        public async ValueTask Configure(SlashCommandContext ctx)
+        {
+            await ctx.DeferResponseAsync();
+            
+        }
+
+        #endregion
+
+        #region CONFIGURE HONEYPOT CHANNEL      
+
+        [Command("configure-honeypot")]
+        [Description("add a honeypot channel to the server")]
+        public async ValueTask ConfigureHoneypot(SlashCommandContext ctx)
+        {
+            await ctx.DeferResponseAsync();
+            using var db = dbFactory.CreateDbContext();
+            var guildObj = db.Guilds.FirstOrDefault(x => x.GuildId == ctx.Guild!.Id);
+
+            if (guildObj != null)
+            {
+                if (guildObj.HoneypotChannelId == 0)
+                {
+                    var chnl = await ctx.Guild!.CreateChannelAsync("honeypot", DiscordChannelType.Text, null, "do not post messages here, you will be kicked then banned from this server");
+                    guildObj.HoneypotChannelId = chnl.Id;
+                    db.Guilds.Update(guildObj);
+                    await db.SaveChangesAsync();
+                }
+            }    
+        }
+
+        #endregion
+
         #region BAN MEMBER WITH REASON
         [Command("ban")]
         [Description("ban a member from the server with a reason")]
@@ -353,6 +428,7 @@ namespace MurdoxV2.SlashCommands.Moderation
             var guild = ctx.Guild!;
             await guild.UnbanMemberAsync(user.Id);
 
+            var author = ctx.Interaction.Message?.Author?.Username ?? "Unknown";
             DiscordComponent[] comps =
             [
                 new DiscordTextDisplayComponent("## Member Unbanned"),
@@ -368,7 +444,7 @@ namespace MurdoxV2.SlashCommands.Moderation
             var msg = new DiscordMessageBuilder()
                 .EnableV2Components()
                 .AddContainerComponent(container);
-            await ctx.RespondAsync($"{ctx.Interaction.Message.Author.Username} has removed a server ban for {user.Mention}");
+            await ctx.RespondAsync($"{author} has removed a server ban for {user.Mention}");
             await Task.Delay(500);
             await user.SendMessageAsync(msg);
         }
@@ -390,7 +466,7 @@ namespace MurdoxV2.SlashCommands.Moderation
                new DiscordTextDisplayComponent("## URL Settings Updated"),
                 new DiscordSeparatorComponent(true),
                 new DiscordTextDisplayComponent($"a mod has {status} urls in the server"),
-                new DiscordTextDisplayComponent($"Guild: {ctx.Guild.Name}"),
+                new DiscordTextDisplayComponent($"Guild: {ctx.Guild?.Name ?? "unknown"}"),
                 new DiscordTextDisplayComponent($"Channel: {ctx.Channel.Name}"),
                 new DiscordSeparatorComponent(true),
                 new DiscordTextDisplayComponent($"Murdox ©️ {timestamp}")

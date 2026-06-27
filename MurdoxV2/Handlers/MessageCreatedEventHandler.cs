@@ -2,28 +2,35 @@
 using DSharpPlus.Entities;
 using DSharpPlus.EventArgs;
 using Microsoft.Extensions.Logging;
+using MurdoxV2.Enums;
+using MurdoxV2.Features.AutoLearning;
 using MurdoxV2.Features.ScamDetection;
 using MurdoxV2.Interfaces;
 using MurdoxV2.Models;
+using MurdoxV2.Services.Builders.Level;
 using MurdoxV2.Services.MessageCache;
 using MurdoxV2.Services.Tags;
 using SkiaSharp;
-using System.Collections.Concurrent;
-using static System.Net.WebRequestMethods;
 
 namespace MurdoxV2.Handlers
 {
     public class MessageCreatedEventHandler(ITagRepository tagRepository, TagEmbedBuilderProviderService tagEmbedBuilder,
         IUrlCaptureService captureService, IUrlRemovaleService removalService, DiscordMessageCacheService msgCache,
-        IScamDetectionService scamService, HttpClient client, ILogger<MessageCreatedEventHandler> logger): IEventHandler<MessageCreatedEventArgs>
+        IScamDetectionService scamService, HttpClient client, ILogger<MessageCreatedEventHandler> logger, 
+        AutoLearningService autoLearnService,ILevel levelService) : IEventHandler<MessageCreatedEventArgs>
     {
         private readonly IScamDetectionService _scamService = scamService;
         private readonly HttpClient _http = client;
         private readonly ILogger<MessageCreatedEventHandler> _logger = logger;
+        private readonly AutoLearningService _autoLearnService = autoLearnService;
+        private readonly ILevel _levelService = levelService;
+
+        private const ulong LOG_CHANNEL_ID = 888659027607814214;
+
         public async Task HandleEventAsync(DiscordClient sender, MessageCreatedEventArgs eventArgs)
         {
             if (eventArgs.Author.IsBot) return;
-
+            
             var ct = new CancellationTokenSource().Token;
             var cachedMsg = new CachedDiscordMessage
             {
@@ -31,6 +38,7 @@ namespace MurdoxV2.Handlers
                 AuthorId = eventArgs.Message.Author!.Id,
                 ChannelId = eventArgs.Message.ChannelId,
                 Content = eventArgs.Message.Content,
+                LastMessageTimestamp = eventArgs.Message.Timestamp,
                 MentionedUserIds = [.. eventArgs.MentionedUsers.Select(x => x.Id)],
             };
             msgCache.Set(cachedMsg);
@@ -59,6 +67,9 @@ namespace MurdoxV2.Handlers
 
                         break;
                     case "dailynumbers":
+
+                        break;
+                    case "xp":
 
                         break;
                     default:
@@ -103,7 +114,7 @@ namespace MurdoxV2.Handlers
                         // Call the updated service signature
                         var result = await _scamService.AnalyzeAsync(context, bytes);
 
-                        if (result.IsActionable)
+                        if (result.Verdict == ScamVerdict.Scam)
                         {
                             await eventArgs.Message.DeleteAsync();
                             await Task.Delay(1000);
@@ -113,9 +124,32 @@ namespace MurdoxV2.Handlers
                             _logger.LogInformation("known scam image detected in guild [{GuildId}]: Name [{GuildName}]: by user {UserId}. Reason: {Reason}",
                                 eventArgs.Guild.Id, eventArgs.Guild.Name, eventArgs.Author.Id, result.Reason);
                         }
+                        else if (result.Verdict == ScamVerdict.Suspicious)
+                        {
+                            _logger.LogWarning("suspicious image detected in guild [{GuildId}]: Name [{GuildName}]: by user {UserId}. Reason: {Reason}",
+                                eventArgs.Guild.Id, eventArgs.Guild.Name, eventArgs.Author.Id, result.Reason);
+                            await _autoLearnService.SendAutoLearnPromptAsync(eventArgs.Guild.Id, bytes, result, eventArgs.Message);
+
+                            //var record = new ScamImageRecord
+                            //{
+                            //    Id = Guid.NewGuid(),
+                            //    AHash = ImageHashing.AverageHash(bitmap),
+                            //    DHash = ImageHashing.DifferenceHash(bitmap),
+                            //    PHash = ImageHashing.PerceptualHash(bitmap),
+                            //    Category = "Suspicious",
+                            //    Description = "Auto Learning for suspicious images",
+                            //    CreatedAt = DateTimeOffset.UtcNow,
+                            //    AddedBy = "Auto Learning"
+                            //};
+                            //await _scamRepo.AddAsync(record);
+                        }
                     }
 
                 }
+                //TODO: if the channel name = honeypot - delete the message and kick and ban the author.
+                var member = await eventArgs.Guild.GetMemberAsync(eventArgs.Message.Author.Id);
+                await _levelService.HandleMessageAsync(member);
+               
             }
         }
 

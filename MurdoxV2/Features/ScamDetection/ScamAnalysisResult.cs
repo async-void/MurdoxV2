@@ -16,6 +16,6 @@ namespace MurdoxV2.Features.ScamDetection
         public ScamImageRecord? Match { get; init; }
         public ScamImageContext? Context { get; init; }
 
-        public bool IsActionable => Verdict == ScamVerdict.Scam || Verdict == ScamVerdict.Suspicious;
+        public bool IsActionable => Verdict == ScamVerdict.Scam;
     }
 }

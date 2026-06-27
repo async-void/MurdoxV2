@@ -29,7 +29,8 @@ namespace MurdoxV2.Services.UrlServices
             return list;
         }
 
-        [GeneratedRegex(@"\b((?:[a-z][a-z0-9+\-.]*://|www\.)[^\s<>()]+|(?:[a-z0-9\-]+\.)+[a-z]{2,}(?:/[^\s<>()]*)?)", RegexOptions.IgnoreCase | RegexOptions.Compiled, "en-US")]
+        // [GeneratedRegex(@"\b((?:[a-z][a-z0-9+\-.]*://|www\.)[^\s<>()]+|(?:[a-z0-9\-]+\.)+[a-z]{2,}(?:/[^\s<>()]*)?)", RegexOptions.IgnoreCase | RegexOptions.Compiled, "en-US")]
+        [GeneratedRegex(@"\b((?:[a-z][a-z0-9+\-.]*://|www\.)[^\s<>()]+|(?:[a-z0-9\-]+\.)+(?:com|net|org|edu|gov|mil|int|io|co|ai|app|dev|me|info|biz|tv|us|uk|ca|au|de|fr|jp|cn|in|br|ru|nl|eu|xyz|online|site|tech|store|cloud|pro|name)\b(?:/[^\s<>()]*)?)", RegexOptions.IgnoreCase | RegexOptions.Compiled, "en-US")]
         private static partial Regex CaptureRegex();
     }
 }

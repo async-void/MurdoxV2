@@ -92,6 +92,39 @@ namespace MurdoxV2.Data.Migrations
                     b.ToTable("Bank");
                 });
 
+            modelBuilder.Entity("MurdoxV2.Models.CachedDiscordMessage", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<decimal>("AuthorId")
+                        .HasColumnType("numeric(20,0)");
+
+                    b.Property<decimal>("ChannelId")
+                        .HasColumnType("numeric(20,0)");
+
+                    b.Property<string>("Content")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<DateTimeOffset?>("LastMessageTimestamp")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.PrimitiveCollection<decimal[]>("MentionedUserIds")
+                        .IsRequired()
+                        .HasColumnType("numeric(20,0)[]");
+
+                    b.Property<decimal>("MessageId")
+                        .HasColumnType("numeric(20,0)");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("CachedMessages");
+                });
+
             modelBuilder.Entity("MurdoxV2.Models.Fact", b =>
                 {
                     b.Property<int>("Id")
@@ -187,6 +220,9 @@ namespace MurdoxV2.Data.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
+                    b.Property<decimal>("HoneypotChannelId")
+                        .HasColumnType("numeric(20,0)");
+
                     b.Property<decimal>("NotificationChannelId")
                         .HasColumnType("numeric(20,0)");
 
@@ -228,7 +264,6 @@ namespace MurdoxV2.Data.Migrations
                         .HasColumnType("text");
 
                     b.Property<string>("GlobalUsername")
-                        .IsRequired()
                         .HasColumnType("text");
 
                     b.Property<decimal>("GuildId")
@@ -246,11 +281,13 @@ namespace MurdoxV2.Data.Migrations
                     b.Property<DateTimeOffset?>("JoinedAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<DateTimeOffset?>("LastMessageTimestamp")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<int>("MessageCount")
                         .HasColumnType("integer");
 
                     b.Property<string>("Nickname")
-                        .IsRequired()
                         .HasColumnType("text");
 
                     b.Property<int?>("ServerId")

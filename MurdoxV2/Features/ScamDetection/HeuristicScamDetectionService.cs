@@ -57,23 +57,33 @@ namespace MurdoxV2.Features.ScamDetection
             ScamVerdict verdict;
             string reason;
 
-            if (pDiff <= hashConfig.PHashThreshold &&
-                dDiff <= hashConfig.DHashThreshold &&
-                aDiff <= hashConfig.AHashThreshold)
+            // Realistic pHash thresholds
+            int A_STRICT = _hashConfig.AHashThreshold;
+            int D_STRICT = _hashConfig.DHashThreshold;
+            int P_STRICT = _hashConfig.PHashThreshold;
+
+            int A_LOOSE = A_STRICT + 6;
+            int D_LOOSE = D_STRICT + 6;
+            int P_LOOSE = P_STRICT + 6;
+
+            if (pDiff <= P_STRICT && dDiff <= D_STRICT && aDiff <= A_STRICT)
             {
                 verdict = ScamVerdict.Scam;
-                reason = "Matched known scam image";
+                reason = $"Exact or near-exact match to known scam image (pHash: {pDiff})";
             }
-            else if (pDiff <= _hashConfig.PHashThreshold + 5)
+            else if ((pDiff <= P_LOOSE && dDiff <= D_LOOSE) ||
+                    (pDiff <= P_LOOSE && aDiff <= A_LOOSE) ||
+                    (dDiff <= D_LOOSE && aDiff <= A_LOOSE)) 
             {
                 verdict = ScamVerdict.Suspicious;
-                reason = "Image is visually similar to known scam templates";
+                reason = $"Image is visually similar to known scam templates (pHash: {pDiff})";
             }
             else
             {
                 verdict = ScamVerdict.Clean;
                 reason = "No significant similarity to known scam images";
             }
+
 
             // 5. Convert distances into a 0–1 score
             float score = CalculateScore(aDiff, dDiff, pDiff);
@@ -100,7 +110,7 @@ namespace MurdoxV2.Features.ScamDetection
         private static float CalculateScore(int aDiff, int dDiff, int pDiff)
         {
             // Normalize distances into a confidence score (0–1)
-            float maxDist = 64f; // assuming 64-bit hashes
+            float maxDist = 64f; 
             float weighted = (pDiff * 3f + dDiff * 2f + aDiff) / (3f + 2f + 1f);
             return 1f - Math.Clamp(weighted / maxDist, 0f, 1f);
         }

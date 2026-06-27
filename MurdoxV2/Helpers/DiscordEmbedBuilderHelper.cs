@@ -1,10 +1,7 @@
 ﻿using DSharpPlus.Entities;
+using MurdoxV2.Features.ScamDetection;
 using MurdoxV2.Models;
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Text;
-using System.Threading.Tasks;
 
 namespace MurdoxV2.Helpers
 {
@@ -36,6 +33,32 @@ namespace MurdoxV2.Helpers
             sb.AppendLine($"**Avatar URL:** [Click Here]({user.AvatarUrl})");
             return Result<StringBuilder, SystemError<DiscordEmbedBuilderHelper>>.Ok(sb);
         }
+        #endregion
+
+        #region BUILD LOGGER EMBED
+
+        public async Task<DiscordContainerComponent> BuildScamImageLogContainer(ScamImageContext ctx)
+        {
+            var btns = new DiscordButtonComponent[]
+            {
+                new(DiscordButtonStyle.Primary, "scamAccept", "Accept", false),
+                new(DiscordButtonStyle.Danger, "scamReject", "Reject", false)
+            };
+
+            DiscordComponent[] comps =
+            [
+                new DiscordTextDisplayComponent("## Scam Image Dectected"),
+                new DiscordSeparatorComponent(true),
+                new DiscordTextDisplayComponent($"Guild: {ctx.Guild.Name}\r\nChannel: {ctx.Channel.Name}\r\nTimestamp: {ctx.Message.Timestamp}"),
+                new DiscordMediaGalleryComponent(new DiscordMediaGalleryItem(ctx.Attachment!.Url!, "scam image", false)),
+                new DiscordSeparatorComponent(true, DiscordSeparatorSpacing.Large),
+                new DiscordActionRowComponent(btns)
+            ];
+            var container = new DiscordContainerComponent(comps, false, DiscordColor.DarkGray);
+
+            return container;
+        }
+
         #endregion
 
     }

@@ -1,4 +1,5 @@
-﻿using Microsoft.EntityFrameworkCore;
+﻿using DSharpPlus;
+using Microsoft.EntityFrameworkCore;
 using MurdoxV2.Data.DbContext;
 using MurdoxV2.Enums;
 using MurdoxV2.Interfaces;
@@ -6,9 +7,10 @@ using MurdoxV2.Models;
 
 namespace MurdoxV2.Services
 {
-    public class MemberDataServiceProvider(IDbContextFactory<AppDbContext> dbFactory) : IMemberData
+    public class MemberDataServiceProvider(IDbContextFactory<AppDbContext> dbFactory, DiscordClient client) : IMemberData
     {
         private readonly IDbContextFactory<AppDbContext> _dbFactory = dbFactory;
+        private readonly DiscordClient _client = client;
 
         #region GET MEMBER
         public async Task<Result<ServerMember, SystemError<MemberDataServiceProvider>>> GetMemberAsync(ulong guildId, ulong discordId)
@@ -18,6 +20,7 @@ namespace MurdoxV2.Services
                 .Include(m => m.Bank)
                 .Include(b => b.Reminders)
                 .Include(m => m.Tickets)
+                .AsSplitQuery()
                 .FirstOrDefaultAsync(m => m.GuildId == guildId && m.DiscordId == discordId);
 
             return mem is not null
@@ -33,6 +36,57 @@ namespace MurdoxV2.Services
         }
         #endregion
 
+        #region GET ALL MEMBERS FOR GUILD
+
+      
+
+        #endregion
+
+        #region GET OR CREATE MEMBER
+
+        public async Task<ServerMember> GetOrCreateMemberAsync(ulong memberId, ulong guildId)
+        {
+            var db = _dbFactory.CreateDbContext();
+            var mem = await db.Members
+                .Include(m => m.Bank)
+                .Include(b => b.Reminders)
+                .Include(m => m.Tickets)
+                .AsSplitQuery()
+                .FirstOrDefaultAsync(m => m.GuildId == guildId && m.DiscordId == memberId);
+            if (mem is not null)
+                return mem;
+
+            var dGuild = await _client.GetGuildAsync(guildId);
+            var dMem = await dGuild.GetMemberAsync(memberId);
+
+            var bank = new Bank
+            {
+                Balance = 100,
+                Deposit_Amount = 100,
+                Withdraw_Amount = 0,
+                Deposit_Timestamp = DateTime.UtcNow,
+            };
+
+            var newUser = new ServerMember
+            {
+                DiscordId = memberId,
+                GuildId = guildId,
+                Discriminator = dMem.Discriminator,
+                AvatarUrl = dMem.AvatarUrl,
+                XP = 100,
+                MessageCount = 1,
+                JoinedAt = dMem.JoinedAt,
+                CreatedAt = DateTime.UtcNow,
+                IsBanned = false,
+                IsBot = false,
+                IsMuted = false,
+                Bank = bank
+            };
+            return newUser;
+        }
+
+        #endregion
+
         #region SAVE MEMBER
         public async Task<Result<bool, SystemError<MemberDataServiceProvider>>> SaveMemberAsync(ServerMember mem)
         {
@@ -43,11 +97,13 @@ namespace MurdoxV2.Services
                     .FirstOrDefaultAsync(m => m.GuildId == mem.GuildId && m.DiscordId == mem.DiscordId);
 
                 if (member is not null)
+                {
+                    db.Entry(member).CurrentValues.SetValues(mem);
+                    await db.SaveChangesAsync();
                     return true;
+                }
 
-                await db.AddAsync(mem);
-                await db.SaveChangesAsync();
-                return true;
+                return false;
             }
             catch (Exception e)
             {
@@ -69,5 +125,19 @@ namespace MurdoxV2.Services
             throw new NotImplementedException();
         }
         #endregion
+
+        #region GET MEMBER XP
+        public async Task<int> GetMemberXPAsync(ulong memberId, ulong guildId)
+        {
+            var db = _dbFactory.CreateDbContext();
+            var member = await db.Members.FirstOrDefaultAsync(x => x.DiscordId == memberId && x.GuildId == guildId);
+            if (member is not null)
+            {
+                var xp = member.XP;
+                return xp;
+            }
+            return -1;
+        }
+        #endregion  
     }
 }

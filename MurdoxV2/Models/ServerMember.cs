@@ -12,14 +12,15 @@ namespace MurdoxV2.Models
         public int Id { get; set; }
         public required ulong DiscordId { get; set; }
         public required ulong GuildId { get; set; }
-        public required string GlobalUsername{ get; set; }
+        public string? GlobalUsername{ get; set; }
         public required string Discriminator { get; set; }
-        public required string Nickname { get; set; }
+        public string? Nickname { get; set; }
         public required string AvatarUrl { get; set; }
         public string? UserStatus { get; set; }
         public int XP { get; set; }
         public DateTimeOffset? JoinedAt { get; set; }
         public DateTimeOffset? CreatedAt { get; set; }
+        public DateTimeOffset? LastMessageTimestamp { get; set; }
         public bool? IsBot { get; set; }
         public bool? IsMuted { get; set; }
         public bool? IsBanned { get; set; }

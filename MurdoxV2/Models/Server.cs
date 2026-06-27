@@ -14,6 +14,7 @@ namespace MurdoxV2.Models
         public ulong OwnerId { get; set; }
         public required string OwnerUsername { get; set; }
         public ulong NotificationChannelId { get; set; }
+        public ulong HoneypotChannelId { get; set; }
         public DateTimeOffset CreatedAt { get; set; }
         public bool EnableFacts { get; set; }
         public bool AllowUrls { get; set; }

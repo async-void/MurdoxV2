@@ -5,41 +5,65 @@ using Microsoft.Extensions.Logging;
 using MurdoxV2.Data.DbContext;
 using MurdoxV2.Features.ScamDetection;
 using MurdoxV2.Hashing;
-using Serilog;
+using MurdoxV2.Models;
 using SkiaSharp;
+using System.Text.Json;
 
-namespace MurdoxV2.Services
+namespace MurdoxV2.Services;
+
+public class BotService(ILogger<BotService> logger, DiscordClient client, IDbContextFactory<AppDbContext> dbFactory) : IHostedService
 {
-    public class BotService(ILogger<BotService> logger, DiscordClient client, IDbContextFactory<AppDbContext> dbFactory, IScamHashRepository repo) : IHostedService
-    {
-        private readonly ILogger<BotService> _logger = logger;
-       //private readonly IHostApplicationLifetime _appLifetime = appLifetime;
-        private readonly DiscordClient _dClient = client;
-        private readonly IDbContextFactory<AppDbContext> _dbFactory = dbFactory;
+    private readonly ILogger<BotService> _logger = logger;
+   //private readonly IHostApplicationLifetime _appLifetime = appLifetime;
+    private readonly DiscordClient _dClient = client;
+    private readonly IDbContextFactory<AppDbContext> _dbFactory = dbFactory;
 
-        public async Task StartAsync(CancellationToken cancellationToken)
+    public async Task StartAsync(CancellationToken cancellationToken)
+    {
+        _logger.LogInformation($"{nameof(BotService)} started");
+        _logger.LogInformation("Connecting to Discord...");
+        //await SetPassword();
+        var db = _dbFactory.CreateDbContext();
+        var pendingMigrations = db.Database.GetPendingMigrations().Any();
+
+        if (pendingMigrations)
         {
-            _logger.LogInformation($"{nameof(BotService)} started");
-            _logger.LogInformation("Connecting to Discord...");
-            var db = _dbFactory.CreateDbContext();
             _logger.LogInformation("running database migrations...");
             await db.Database.MigrateAsync(cancellationToken: cancellationToken);
             _logger.LogInformation("database migration complete!");
-            //await SeedScamImage(repo);
-            await _dClient.ConnectAsync();
+            
         }
+        await _dClient.ConnectAsync();
+    }
 
-        public async Task StopAsync(CancellationToken cancellationToken)
-        {
-            _logger.LogInformation("Disconnecting from Discord...");
-            await _dClient.DisconnectAsync();
-        }
+    public async Task StopAsync(CancellationToken cancellationToken)
+    {
+        _logger.LogInformation("Disconnecting from Discord...");
+        await _dClient.DisconnectAsync();
+    }
 
-        public static async Task SeedScamImage(IScamHashRepository repo)
+    #region SET PASSWORD PROPERTY
+
+    private static async Task SetPassword()
+    {
+        var jsonPath = Path.Combine(AppContext.BaseDirectory, "Data", "Config", "config.json");
+        var jsonContent = await File.ReadAllTextAsync(jsonPath);
+        var json = JsonSerializer.Deserialize<ConfigJson>(jsonContent);
+        var replaced = json.ConnectionStrings!.Murdox!.Replace("_G", "g");
+        File.WriteAllText(jsonPath, replaced);
+
+    }
+
+    #endregion
+    public static async Task SeedScamImage(IScamHashRepository repo)
+    {
+        var files = Directory.GetFiles("SeedImages");
+        var bytes = File.ReadAllBytes("crypto.png");
+
+        foreach (var file in files)
         {
-            var files = Directory.GetFiles("SeedImages");
-            var bytes = File.ReadAllBytes("crypto.png");
-            using var bitmap = SKBitmap.Decode(bytes);
+            var fileBytes = File.ReadAllBytes(file);
+            using var bitmap = SKBitmap.Decode(fileBytes);
 
             var record = new ScamImageRecord
             {
@@ -47,14 +71,14 @@ namespace MurdoxV2.Services
                 AHash = ImageHashing.AverageHash(bitmap),
                 DHash = ImageHashing.DifferenceHash(bitmap),
                 PHash = ImageHashing.PerceptualHash(bitmap),
-                Category = "Test",
-                Description = "Synthetic crypto giveaway",
+                Category = "Seed",
+                Description = "Discord Scam Images",
                 CreatedAt = DateTimeOffset.UtcNow,
-                AddedBy = "Gene"
+                AddedBy = "Owner"
             };
 
             await repo.AddAsync(record);
         }
-
     }
+
 }

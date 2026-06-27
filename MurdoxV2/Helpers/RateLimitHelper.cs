@@ -7,16 +7,12 @@ using System.Threading.Tasks;
 
 namespace MurdoxV2.Helpers
 {
-    public sealed class RateLimitHelper<TKey> where TKey: notnull
+    public sealed class RateLimitHelper<TKey>(TimeSpan cooldown) where TKey: notnull
     {
         private readonly ConcurrentDictionary<TKey, SemaphoreSlim> _userLocks = new();
         private readonly ConcurrentDictionary<TKey, DateTimeOffset> _nextAvailable = new();
-        private readonly TimeSpan Cooldown;
+        private readonly TimeSpan Cooldown = cooldown;
 
-        public RateLimitHelper(TimeSpan cooldown)
-        {
-            Cooldown = cooldown;
-        }
         public async Task WaitForRateLimitAsync(TKey key)
         {
             var sem = _userLocks.GetOrAdd(key, _ => new SemaphoreSlim(1, 1));
