@@ -15,7 +15,7 @@ namespace MurdoxV2.Services
         {
             try
             {
-                logger.LogInformation($"fetching reminders from database...");
+                logger.LogInformation($"updating reminder cache...");
                 var reminders = await _reminderService.GetAllRemindersAsync();
                
                 if (reminders.IsOk)

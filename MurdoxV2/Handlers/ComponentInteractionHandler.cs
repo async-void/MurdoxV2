@@ -13,6 +13,7 @@ public class ComponentInteractionHandler(ButtonRouter router) : IEventHandler<Co
         var componentType = e.Interaction.Data.ComponentType;
         if (componentType != DiscordComponentType.Button)
             return;
+
         var customId = e.Interaction.Data.CustomId;
 
         if (router.TryGetHandler(customId, out var handler))

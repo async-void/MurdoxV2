@@ -13,5 +13,7 @@ namespace MurdoxV2.Models
         public string? Token { get; set; }
         [JsonPropertyName("prefix")]
         public string? Prefix { get; set; }
+        [JsonPropertyName("authorization")]
+        public AuthorizationConfig? Authorization { get; init; } = new();
     }
 }

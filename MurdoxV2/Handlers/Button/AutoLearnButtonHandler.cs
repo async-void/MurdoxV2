@@ -1,7 +1,6 @@
 ﻿using DSharpPlus.Entities;
 using DSharpPlus.EventArgs;
 using MurdoxV2.Features.AutoLearning;
-using MurdoxV2.Interfaces;
 
 namespace MurdoxV2.Handlers.Button;
 

@@ -3,9 +3,9 @@ using DSharpPlus.Commands.ContextChecks;
 
 namespace MurdoxV2.RoleCheck
 {
-    public sealed class SystemNotificationRoleCheck : IContextCheck<SystemNotificationRoleAttribute>
+    public sealed class ModerationRoleCheck : IContextCheck<ModerationRoleAttribute>
     {
-        public ValueTask<string?> ExecuteCheckAsync(SystemNotificationRoleAttribute attribute, CommandContext ctx)
+        public ValueTask<string?> ExecuteCheckAsync(ModerationRoleAttribute attribute, CommandContext ctx)
         {
             var callingMember = ctx.Member ?? throw new ArgumentNullException(nameof(ctx.Member));
             var hasPermission = callingMember.Permissions.HasFlag(attribute.AllowedPermission);
@@ -16,4 +16,3 @@ namespace MurdoxV2.RoleCheck
         }
     }
 }
-

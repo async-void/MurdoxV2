@@ -1,6 +1,5 @@
 ﻿using DSharpPlus.Entities;
 using DSharpPlus.EventArgs;
-using MurdoxV2.Interfaces;
 using MurdoxV2.Pagination;
 using System;
 using System.Collections.Generic;

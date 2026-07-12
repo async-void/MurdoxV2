@@ -9,6 +9,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 using MurdoxV2.Cache.TicketCache;
 using MurdoxV2.Coordinators;
 using MurdoxV2.Data.DbContext;
@@ -18,6 +19,7 @@ using MurdoxV2.Features.AutoLearning;
 using MurdoxV2.Features.ScamDetection;
 using MurdoxV2.Handlers;
 using MurdoxV2.Handlers.Button;
+using MurdoxV2.Handlers.Modal;
 using MurdoxV2.Helpers;
 using MurdoxV2.Interfaces;
 using MurdoxV2.MessageQueue.SystemNotification;
@@ -26,11 +28,13 @@ using MurdoxV2.QuartzJobs;
 using MurdoxV2.Repositories;
 using MurdoxV2.RoleCheck;
 using MurdoxV2.Services;
+using MurdoxV2.Services.Authorization;
 using MurdoxV2.Services.Builders;
 using MurdoxV2.Services.Builders.Level;
 using MurdoxV2.Services.Builders.Profile;
 using MurdoxV2.Services.Level;
 using MurdoxV2.Services.MessageCache;
+using MurdoxV2.Services.Serializers;
 using MurdoxV2.Services.Tags;
 using MurdoxV2.Services.Tickets;
 using MurdoxV2.Services.UrlServices;
@@ -54,57 +58,59 @@ internal class Program
    
     static async Task Main(string[] eventArgs)
     {
-        var configService = new ConfigurationDataServiceProvider();
-        var token = await configService.GetDiscordTokenAsync();
-        var conStr = await configService.GetConnectionStringsAsync();
         TimestampDataProvider.SetBotTimestamp();
 
-        if (!token.IsOk)
-        {
-            Log.Information($"Error retrieving token: {token.Error.ErrorMessage}");
-            return;
-        }
-
         var intents = TextCommandProcessor.RequiredIntents | SlashCommandProcessor.RequiredIntents | DiscordIntents.All;
-        var configuration = new ConfigurationBuilder()
-            .SetBasePath(Directory.GetCurrentDirectory())
-            .AddJsonFile(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Data", "Config", "config.json"), optional: false, reloadOnChange: true)
-            .Build();
-
+        //var configuration = new ConfigurationBuilder()
+        //    .SetBasePath(Directory.GetCurrentDirectory())
+        //    .AddJsonFile(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Data", "Config", $"config.{GetOsName().ToLower()}.json"), optional: false, reloadOnChange: true)
+        //    .Build();
+        //var conStr = configuration.GetConnectionString("murdox");
+        //var token = configuration.GetSection("Discord")["token"] ?? throw new InvalidOperationException("Missing Discord token.");
+        //var roleIds = configuration.GetSection("Discord:authorization:authorizedRoleIds")
+        //    .Get<string[]>()?
+        //    .Select(ulong.Parse)
+        //    .ToList() ?? throw new InvalidOperationException("Missing authorization role IDs.");
+        //var allowAdmins = configuration.GetValue<bool>("Discord:authorization:allowAdmins");
         Log.Logger = new LoggerConfiguration()
             .Enrich.With(new ColoredSourceContextEnricher())
             .Enrich.With(new FourLetterLevelEnricher())
             .Enrich.With(new RenderedMessageEnricher())
-            .ReadFrom.Configuration(configuration)
             .WriteTo.Console(
                 theme: AnsiConsoleTheme.Code,
                 outputTemplate: "[{Timestamp:M-d-yyyy h:mm:ss.fff tt}] [{ColoredSourceContextPadded}] {ColoredLevel} {ColoredMessage}{NewLine}{Exception}")
             .CreateLogger();
 
         await Host.CreateDefaultBuilder()
+            .ConfigureLogging(logging =>
+            {
+                logging.ClearProviders();
+            })
             .UseSerilog()
             .UseConsoleLifetime()
 
-        #region CONFIGURE SERVICES
+            #region CONFIGURE SERVICES
             .ConfigureServices((context, services) =>
             {
-                services.Configure<ConfigJson>(configuration.GetSection("Discord"));
+                services.AddSingleton(new ConfigSerializationService(Path.Combine(AppContext.BaseDirectory, "Data", "Config", $"config.{GetOsName().ToLower()}.json")));
+
+                var tempProvider = services.BuildServiceProvider();
+                var cfg = tempProvider.GetRequiredService<ConfigSerializationService>().Config;
+
                 services.AddHostedService<BotService>()
-                    .AddDiscordClient(token.Value, intents)
+                    .AddDiscordClient(cfg.Discord!.Token!, intents)
                     .AddCommandsExtension((options, config) =>
                     {
-                        config.AddCommands(Assembly.GetExecutingAssembly());
                         config.AddCheck<SystemNotificationRoleCheck>();
-                        //config.AddCommands([typeof(ModerationCommands)]);
+                        config.AddCheck<ModerationRoleCheck>();
+                        config.AddCommands(Assembly.GetExecutingAssembly()); 
                     })
                     .AddInteractivityExtension();
-                   
 
-                var murdox = conStr.Value?.ConnectionStrings?.Murdox
-                        ?? throw new InvalidOperationException("Missing Murdox connection string.");
                 services.AddDbContextFactory<AppDbContext>(options =>
                 {
-                    options.UseNpgsql(murdox);
+                    options.UseNpgsql(cfg.ConnectionStrings!.Murdox);
+                    options.UseLoggerFactory(LoggerFactory.Create(builder => { }));
                 });
                 
                 services.AddSingleton<IMemberData, MemberDataServiceProvider>();
@@ -153,11 +159,27 @@ internal class Program
                 services.AddSingleton<ILevel, LevelService>();
                 services.AddSingleton<IProfile,  ProfileService>();
                 services.AddSingleton<ProfileImageBuilderService>();
+                services.AddSingleton(provider =>
+                {
+                    var configService = provider.GetRequiredService<ConfigSerializationService>();
+                    var cfg = configService.Config;
+                    return new RoleAuthorizationService(cfg.Discord!.Authorization!.AuthorizedRoleIds, cfg.Discord.Authorization.AllowAdmins);
+                });
                 
+                //BUTTON HANDLERS
                 services.AddSingleton<IButtonHandler, DonateButtonHandler>();
                 services.AddSingleton<IButtonHandler, PaginationButtonHandler>();
                 services.AddSingleton<IButtonHandler, AutoLearnButtonHandler>();
+                services.AddSingleton<IButtonHandler, ConfigureButtonHandler>();
+                services.AddSingleton<IButtonHandler, PurgeButtonHandler>();
+                services.AddSingleton<IButtonHandler, BanButtonHandler>();
+                services.AddSingleton<IButtonHandler, WarnButtonHandler>();
+                services.AddSingleton<IButtonHandler, UptimeButtonHandler>();
                 services.AddSingleton<ButtonRouter>();
+
+                //MODAL HANDLERS
+                services.AddSingleton<IModalHandler, HoneypotModalHandler>();
+                services.AddSingleton<ModalRouter>();
 
                 #region QUARTS
                 services.AddQuartz(q =>
@@ -196,7 +218,6 @@ internal class Program
                 services.AddQuartzHostedService(q => q.WaitForJobsToComplete = true);
                 #endregion
 
-
                 #region EVENT HANDLERS
                 services.ConfigureEventHandlers(
                     e => e.AddEventHandlers<MessageCreatedEventHandler>(ServiceLifetime.Singleton)
@@ -208,9 +229,9 @@ internal class Program
                           .AddEventHandlers<SessionResumedEventHandler>(ServiceLifetime.Singleton)
                           .AddEventHandlers<ComponentInteractionHandler>(ServiceLifetime.Singleton)
                           .AddEventHandlers<MessageDeletedEventHandler>(ServiceLifetime.Singleton)
-                          //.AddEventHandlers<InteractionEventHandler>(ServiceLifetime.Singleton)
+                          .AddEventHandlers<InteractionEventHandler>(ServiceLifetime.Singleton)
 
-                    #region SOCKETS
+                #region SOCKETS
                 .HandleSocketClosed((s, e) =>
                 {
                     Log.Information($"Socket closed with code: {e.CloseCode} reason: {e.CloseMessage}");
@@ -235,14 +256,28 @@ internal class Program
                 #endregion
             })
             .RunConsoleAsync();
-        
-        var cleanup = new CleanUp(new AppDbContextFactory(conStr.Value.ConnectionStrings!.Murdox!));
+
+            #endregion
+        var newCfg = new ConfigSerializationService(Path.Combine(AppContext.BaseDirectory, "Data", "Config", $"config.{GetOsName().ToLower()}.json"));
+        var cleanup = new CleanUp(new AppDbContextFactory(newCfg.Config!.ConnectionStrings!.Murdox!));
         await cleanup.SaveMemberDataOnCloseAsync(_userRank);
         await Log.CloseAndFlushAsync();
 
-        #endregion
+        
 
         //var urlRegex = new Regex(@"\b(?:[a-z][a-z0-9+\-.]*://|www\.)[^\s<>()]+",
         //  RegexOptions.Compiled | RegexOptions.IgnoreCase);
+    }
+
+    static string GetOsName()
+    {
+        if (OperatingSystem.IsWindows())
+            return "Windows";
+        else if (OperatingSystem.IsLinux())
+            return "Linux";
+        else if (OperatingSystem.IsMacOS())
+            return "macOS";
+        else
+            return "Unknown OS";
     }
 }

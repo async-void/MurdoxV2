@@ -1,108 +1,32 @@
 ﻿using DSharpPlus;
 using DSharpPlus.Entities;
 using DSharpPlus.EventArgs;
-using MurdoxV2.Handlers.Button;
-using MurdoxV2.Utilities.Timestamp;
+using MurdoxV2.Handlers.Modal;
 
 namespace MurdoxV2.Handlers;
 
-public class InteractionEventHandler(ButtonRouter router) : IEventHandler<InteractionCreatedEventArgs>
+public class InteractionEventHandler(ModalRouter modalRouter) : IEventHandler<ModalSubmittedEventArgs>
 {
-    public async Task HandleEventAsync(DiscordClient client, InteractionCreatedEventArgs eventArgs)
+    public async Task HandleEventAsync(DiscordClient client, ModalSubmittedEventArgs eventArgs)
     {
-       
+
+        if (eventArgs.Interaction.Type != DiscordInteractionType.ModalSubmit) return;
+
         switch (eventArgs.Interaction.Type)
         {
-            #region BUTTONS
-            case DiscordInteractionType.Component:
-
-                switch (eventArgs.Interaction.Data.CustomId)
+            #region MODALS
+            case DiscordInteractionType.ModalSubmit:
+                var modalId = eventArgs.Interaction.Data.CustomId;
+                if (modalRouter.TryGetHandler(modalId, out var handler))
                 {
-                    case "purgeBtn":
-                        // Handle purge button interaction
-                        DiscordComponent[] components =
-                           [
-                              new DiscordTextDisplayComponent($"## Purge"),
-                              new DiscordSeparatorComponent(true),
-                              new DiscordTextDisplayComponent("this command will delete a set amount of messages from the chat history."),
-                              new DiscordSeparatorComponent(true, DiscordSeparatorSpacing.Large),
-                              new DiscordSectionComponent(new DiscordTextDisplayComponent($"-# Murdox ©️ {DateTime.UtcNow:ddd, MM-dd-yyyy hh:mm tt}"),
-                                 new DiscordButtonComponent(DiscordButtonStyle.Secondary, "donateBtn", "Donate"))
-                           ];
-                        var container = new DiscordContainerComponent(components, false, DiscordColor.DarkGray);
-
-                        var message = new DiscordInteractionResponseBuilder()
-                        .EnableV2Components()
-                        .AddContainerComponent(container);
-
-                        await eventArgs.Interaction.CreateResponseAsync(DiscordInteractionResponseType.UpdateMessage, new DiscordInteractionResponseBuilder(message));
-                        break;
-                    case "banBtn":
-                        // Handle ban button interaction
-                        await eventArgs.Interaction.CreateResponseAsync(DiscordInteractionResponseType.UpdateMessage, new DiscordInteractionResponseBuilder()
-                            .WithContent("Ban button clicked!"));
-                        break;
-                    case "warnBtn":
-                        // Handle warn button interaction
-                        await eventArgs.Interaction.CreateResponseAsync(DiscordInteractionResponseType.UpdateMessage, new DiscordInteractionResponseBuilder()
-                            .WithContent("Warn button clicked!"));
-                        break;
-                    case "donateBtn":
-                        // Handle warn button interaction
-                        await eventArgs.Interaction.CreateResponseAsync(DiscordInteractionResponseType.UpdateMessage, new DiscordInteractionResponseBuilder()
-                            .WithContent("Donate button clicked!"));
-                        break;
-                   
-                    #region UPTIME
-                    case "uptimeBtn":
-                        // Handle warn button interaction
-                        break;
-                    #endregion
-
-                    #region PING 
-                    case "pingBtn": //TODO: fix me
-                        var lifetime = await TimestampDataProvider.GetBotUptimeAsync();
-                        components =
-                          [
-                              new DiscordTextDisplayComponent($"# Ping"),
-                              new DiscordSeparatorComponent(true),
-                              new DiscordTextDisplayComponent($"Ping is a wip, the bot devs are working on this feature."),
-                              new DiscordTextDisplayComponent($"Uptime: {lifetime}"),
-                              new DiscordTextDisplayComponent($"Discord: "),
-                              new DiscordTextDisplayComponent($"DB: "),
-                              new DiscordSeparatorComponent(true, DiscordSeparatorSpacing.Large),
-                              new DiscordSectionComponent(new DiscordTextDisplayComponent($"-# Murdox ©️ {DateTime.UtcNow:ddd, MM-dd-yyyy hh:mm tt}"),
-                                    new DiscordButtonComponent(DiscordButtonStyle.Secondary, "donateBtn", "Donate")),
-                          ];
-                        container = new DiscordContainerComponent(components, false, DiscordColor.Grayple);
-
-                        message = new DiscordInteractionResponseBuilder()
-                        .EnableV2Components()
-                        .AddContainerComponent(container);
-                        await eventArgs.Interaction.CreateResponseAsync(DiscordInteractionResponseType.UpdateMessage, new DiscordInteractionResponseBuilder(message));
-                        break;
-                    #endregion
-
-                    #region DEFAULT
-                    default:
-                        components =
-                          [
-                              new DiscordTextDisplayComponent($"# Uknown Command"),
-                              new DiscordSeparatorComponent(true),
-                              new DiscordTextDisplayComponent($"I don't recognize this command!"),
-                              new DiscordSeparatorComponent(true, DiscordSeparatorSpacing.Large),
-                              new DiscordSectionComponent(new DiscordTextDisplayComponent("Donatations help to keep Murdox online!"),
-                                    new DiscordButtonComponent(DiscordButtonStyle.Secondary, "donateBtn", "Donate"))
-                          ];
-                        container = new DiscordContainerComponent(components, false, DiscordColor.NotQuiteBlack);
-
-                        message = new DiscordInteractionResponseBuilder()
-                        .EnableV2Components()
-                        .AddContainerComponent(container);
-                        await eventArgs.Interaction.CreateResponseAsync(DiscordInteractionResponseType.UpdateMessage, new DiscordInteractionResponseBuilder(message));
-                        break;
-                    #endregion
+                    await handler.HandleAsync(eventArgs);
+                    return;
                 }
+
+                await eventArgs.Interaction.CreateResponseAsync(DiscordInteractionResponseType.ChannelMessageWithSource,
+                    new DiscordInteractionResponseBuilder()
+                        .WithContent($"No modal handler found for ID: {modalId} TYPE: [{handler.GetType()}")
+                        .AsEphemeral());
                 break;
             #endregion
 
@@ -114,9 +38,9 @@ public class InteractionEventHandler(ButtonRouter router) : IEventHandler<Intera
             default:
                 DiscordComponent[] defaultComp =
                 [
-                new DiscordTextDisplayComponent($"## Uknown Command"),
+                new DiscordTextDisplayComponent($"## Uknown Interaction Type"),
                 new DiscordSeparatorComponent(true),
-                new DiscordTextDisplayComponent($"Command Un-Recognized"),
+                new DiscordTextDisplayComponent($"[Interaction.Type] Un-Recognized"),
                 new DiscordSeparatorComponent(true, DiscordSeparatorSpacing.Large),
                 new DiscordSectionComponent(new DiscordTextDisplayComponent("Donatations help to keep Murdox online!"),
                 new DiscordButtonComponent(DiscordButtonStyle.Secondary, "donateBtn", "Donate"))
