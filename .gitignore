@@ -362,3 +362,5 @@ MigrationBackup/
 
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
+/MurdoxV2/Data/Config/config.linux.json
+/MurdoxV2/Data/Config/config.windows.json
